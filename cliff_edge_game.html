@@ -1,0 +1,2366 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Duck Race</title>
+  <style>
+    * { box-sizing: border-box; }
+    :root { --run-duration: 0.5s; }
+    body {
+      margin: 0;
+      font-family: Arial, Helvetica, sans-serif;
+      background: #0a0a1a;
+      color: #1f2937;
+      overflow-x: hidden;
+    }
+    #vortexCanvas {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 0;
+      pointer-events: none;
+    }
+    .container {
+      position: relative;
+      z-index: 1;
+      max-width: min(1100px, 90vw);
+      margin: 0 auto;
+      padding: 24px;
+    }
+    @media (min-width: 1600px) {
+      .container { max-width: min(1300px, 85vw); }
+    }
+    @media (min-width: 1900px) {
+      .container { max-width: min(1500px, 80vw); }
+      .header h1 { font-size: 38px; }
+      .header p { font-size: 17px; }
+      .panel h2 { font-size: 24px; }
+      textarea { min-height: 220px; font-size: 16px; }
+      button { padding: 14px 20px; font-size: 16px; }
+      .badge { font-size: 15px; padding: 10px 16px; }
+      .race-wrapper { min-height: 600px; }
+    }
+    .card,
+    .character-page-card {
+      background: rgba(255,255,255,0.92);
+      border: 1px solid #dbeafe;
+      border-radius: 20px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.08);
+      overflow: hidden;
+    }
+    .character-page-card {
+      margin-top: 20px;
+      padding: 20px;
+    }
+    .header {
+      padding: 24px;
+      background: linear-gradient(135deg, #60a5fa, #a78bfa);
+      color: white;
+    }
+    .header h1 {
+      margin: 0 0 8px;
+      font-size: 32px;
+    }
+    .header p {
+      margin: 0;
+      opacity: 0.95;
+    }
+    .top-nav {
+      display: flex;
+      gap: 10px;
+      margin-top: 16px;
+      margin-bottom: 12px;
+      flex-wrap: wrap;
+    }
+    .nav-btn.active {
+      background: #111827;
+      color: white;
+    }
+    .page { display: none; }
+    .page.active { display: block; }
+    .grid {
+      display: grid;
+      grid-template-columns: 320px 1fr;
+      gap: 20px;
+      padding: 20px;
+    }
+    .panel {
+      background: #ffffff;
+      border: 1px solid #e5e7eb;
+      border-radius: 16px;
+      padding: 18px;
+    }
+    .panel h2,
+    .character-page-card h2 {
+      margin-top: 0;
+      font-size: 20px;
+    }
+    textarea {
+      width: 100%;
+      min-height: 180px;
+      resize: vertical;
+      border: 1px solid #cbd5e1;
+      border-radius: 12px;
+      padding: 12px;
+      font-size: 14px;
+      outline: none;
+      font-family: inherit;
+    }
+    textarea:focus {
+      border-color: #60a5fa;
+      box-shadow: 0 0 0 3px rgba(96,165,250,0.2);
+    }
+    .hint,
+    .footer-note,
+    .character-card p {
+      font-size: 13px;
+      color: #6b7280;
+      line-height: 1.5;
+    }
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 16px;
+    }
+    button {
+      border: 0;
+      border-radius: 12px;
+      padding: 12px 16px;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: transform 0.15s ease, opacity 0.15s ease;
+    }
+    button:hover { transform: translateY(-1px); }
+    button:disabled {
+      cursor: not-allowed;
+      opacity: 0.6;
+      transform: none;
+    }
+    .primary { background: #2563eb; color: white; }
+    .secondary { background: #e5e7eb; color: #111827; }
+    .accent { background: #10b981; color: white; }
+    .race-wrapper {
+      position: relative;
+      overflow: hidden;
+      border-radius: 18px;
+      border: 1px solid #dbeafe;
+      background: linear-gradient(180deg, #dff4ff 0%, #f8fdff 100%);
+      padding: 16px;
+      min-height: 520px;
+    }
+    .track-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .badge {
+      background: #eff6ff;
+      color: #1d4ed8;
+      padding: 8px 12px;
+      border-radius: 999px;
+      font-size: 13px;
+      font-weight: 700;
+      border: 1px solid #bfdbfe;
+    }
+    .track {
+      position: relative;
+      border-radius: 16px;
+      overflow: hidden;
+      border: 1px solid #cfe6ff;
+      height: 500px;
+      min-height: 500px;
+      --lane-height: 76px;
+      --track-safe-top: 58px;
+      --track-safe-bottom: 20px;
+      --runner-scale: 1;
+      background: linear-gradient(180deg, #eef9ff 0%, #dff4ff 100%);
+    }
+    .track-world {
+      position: absolute;
+      left: 0;
+      top: var(--track-safe-top, 16px);
+      width: var(--world-width, 8300px);
+      height: calc(100% - var(--track-safe-top, 16px) - var(--track-safe-bottom, 20px));
+      z-index: 2;
+      background:
+        linear-gradient(90deg, #fde7e7 0 120px, transparent 120px 100%),
+        linear-gradient(180deg, #f9fdff 0%, #e8f6ff 100%);
+      will-change: transform;
+    }
+    .grass-layer {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      z-index: 1;
+    }
+    .grass-clump {
+      position: absolute;
+      width: 16px;
+      height: 12px;
+      opacity: 0.95;
+      filter: drop-shadow(0 1px 1px rgba(0,0,0,0.08));
+    }
+    .grass-clump::before,
+    .grass-clump::after,
+    .grass-clump span {
+      content: '';
+      position: absolute;
+      bottom: 0;
+      width: 6px;
+      border-radius: 8px 8px 0 0;
+      transform-origin: bottom center;
+    }
+    .grass-clump::before {
+      left: 1px;
+      height: 10px;
+      background: #22c55e;
+      transform: rotate(-14deg);
+    }
+    .grass-clump::after {
+      right: 1px;
+      height: 9px;
+      background: #16a34a;
+      transform: rotate(16deg);
+    }
+    .grass-clump span {
+      left: 5px;
+      height: 12px;
+      background: #4ade80;
+      transform: rotate(-2deg);
+    }
+    .pebble {
+      position: absolute;
+      pointer-events: none;
+      z-index: 1;
+      border-radius: 50% 45% 50% 40%;
+      opacity: 0.7;
+      filter: drop-shadow(0 1px 0 rgba(0,0,0,0.1));
+    }
+    /* ── Spectators ── */
+    .spectator-area {
+      position: absolute;
+      top: -58px;
+      left: 0;
+      width: var(--world-width, 8300px);
+      height: 58px;
+      z-index: 1;
+      background: linear-gradient(180deg, #a8cce8 0%, #c4dfef 30%, #ddeeff 70%, #e8f4ff 100%);
+      border-bottom: 2px solid rgba(100,160,220,0.25);
+      overflow: hidden;
+    }
+    .spectator-row {
+      position: absolute;
+      left: 0;
+      width: var(--world-width, 8300px);
+      display: flex;
+      align-items: flex-end;
+      gap: 1px;
+      padding: 0 4px;
+    }
+    .spectator-row.row-back {
+      bottom: 24px;
+      transform-origin: bottom center;
+      opacity: 0.5;
+      z-index: 1;
+    }
+    .spectator-row.row-mid {
+      bottom: 14px;
+      transform-origin: bottom center;
+      opacity: 0.75;
+      z-index: 2;
+    }
+    .spectator-row.row-front {
+      bottom: 2px;
+      transform-origin: bottom center;
+      opacity: 1;
+      z-index: 3;
+    }
+    .spectator-row.row-back .spectator { transform: scale(0.6); }
+    .spectator-row.row-mid .spectator { transform: scale(0.8); }
+    .spectator-row.row-back .spectator,
+    .spectator-row.row-mid .spectator { margin: 0 -2px; }
+    .spectator {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      flex-shrink: 0;
+      transform-origin: bottom center;
+      width: 16px;
+      height: 32px;
+    }
+    .spectator-head {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      position: absolute;
+      top: 0;
+      z-index: 3;
+    }
+    .spectator-body {
+      width: 12px;
+      height: 14px;
+      border-radius: 4px 4px 2px 2px;
+      position: absolute;
+      top: 9px;
+      z-index: 2;
+    }
+    .spectator-arms {
+      width: 18px;
+      height: 4px;
+      border-radius: 2px;
+      position: absolute;
+      top: 11px;
+      z-index: 1;
+    }
+    .spectator.cheering .spectator-arms {
+      animation: spectatorCheer 0.4s ease-in-out infinite alternate;
+    }
+    .spectator.waving .spectator-arms {
+      animation: spectatorWave 0.6s ease-in-out infinite alternate;
+    }
+    @keyframes spectatorCheer {
+      0% { transform: translateY(0) rotate(-10deg); }
+      100% { transform: translateY(-4px) rotate(10deg); }
+    }
+    @keyframes spectatorWave {
+      0% { transform: rotate(-15deg); }
+      100% { transform: rotate(15deg); }
+    }
+    .spectator.jumping {
+      animation: spectatorJump 0.5s ease-in-out infinite alternate;
+    }
+    @keyframes spectatorJump {
+      0% { transform: translateY(0); }
+      100% { transform: translateY(-3px); }
+    }
+
+    .finish-line {
+      position: absolute;
+      right: 48px;
+      top: 0;
+      bottom: 0;
+      width: 18px;
+      background: linear-gradient(45deg, #111 25%, #fff 25%, #fff 50%, #111 50%, #111 75%, #fff 75%, #fff 100%);
+      background-size: 18px 18px;
+      box-shadow: -3px 0 0 rgba(0,0,0,0.08);
+      z-index: 1;
+    }
+    .lane {
+      position: relative;
+      height: var(--lane-height, 76px);
+    }
+    .lane-label { display: none; }
+    .runner {
+      position: absolute;
+      left: 16px;
+      top: 50%;
+      transform: translateY(-50%);
+      transform-origin: left center;
+      width: 72px;
+      height: 82px;
+      z-index: 2;
+      transition: filter 0.2s ease;
+    }
+    .runner.celebrate { filter: drop-shadow(0 0 12px rgba(250, 204, 21, 0.9)); }
+    .runner.fatigued { filter: saturate(0.9) brightness(0.96); }
+    .runner.fatigued .runner-sprite .torso-wrap { transform: translateY(2px) rotate(3deg); }
+    .runner.fatigued .runner-sprite .head { transform: translateY(1px); }
+    .runner.fatigued .runner-sprite .shadow { transform: scaleX(1.08); opacity: 0.22; }
+    .runner:not(.running) .runner-sprite .torso-wrap { animation: none; transform: translateY(0) rotate(0deg); }
+    .runner:not(.running) .runner-sprite .arm.left { animation: none; transform: rotate(10deg) translateY(0); }
+    .runner:not(.running) .runner-sprite .arm.right { animation: none; transform: rotate(-10deg) translateY(0); }
+    .runner:not(.running) .runner-sprite .leg.left { animation: none; transform: rotate(8deg) translateY(0); }
+    .runner:not(.running) .runner-sprite .leg.right { animation: none; transform: rotate(-8deg) translateY(0); }
+    .runner:not(.running) .runner-sprite .shadow { animation: none; transform: scaleX(1); opacity: 0.16; }
+    .runner-sprite {
+      position: relative;
+      width: 72px;
+      height: 82px;
+      transform-origin: 50% 100%;
+    }
+    .runner-sprite .shadow {
+      position: absolute;
+      left: 14px;
+      bottom: 3px;
+      width: 42px;
+      height: 10px;
+      background: rgba(15, 23, 42, 0.12);
+      border-radius: 999px;
+      filter: blur(1px);
+      animation: shadowRun var(--run-duration) infinite linear;
+      animation-play-state: paused;
+    }
+    .runner-sprite .torso-wrap {
+      position: absolute;
+      left: 20px;
+      top: 12px;
+      width: 30px;
+      height: 52px;
+      transform-origin: 50% 85%;
+      animation: bodyBounce var(--run-duration) infinite linear;
+      animation-play-state: paused;
+    }
+    .runner-sprite .head {
+      position: absolute;
+      left: 6px;
+      top: 0;
+      width: 18px;
+      height: 18px;
+      background: #f4c7a1;
+      border-radius: 50%;
+      border: 1px solid rgba(0,0,0,0.08);
+      z-index: 4;
+    }
+    .runner-sprite .hair {
+      position: absolute;
+      left: 4px;
+      top: -1px;
+      width: 20px;
+      height: 10px;
+      background: #1f2937;
+      border-radius: 10px 10px 6px 6px;
+      z-index: 5;
+    }
+    .runner-sprite .hat,
+    .runner-sprite .cross,
+    .runner-sprite .medal,
+    .runner-sprite .badge-mini,
+    .runner-sprite .tie,
+    .runner-sprite .patch,
+    .runner-sprite .tear,
+    .runner-sprite .hole,
+    .runner-sprite .stethoscope,
+    .runner-sprite .stethoscope-ear,
+    .runner-sprite .stethoscope-head,
+    .runner-sprite .guitar,
+    .runner-sprite .guitar-neck,
+    .runner-sprite .guitar-head,
+    .runner-sprite .guitar-hole,
+    .runner-sprite .guitar-strings,
+    .runner-sprite .apron,
+    .runner-sprite .tool,
+    .runner-sprite .helmet-band,
+    .runner-sprite .card-mark,
+    .runner-sprite .glove,
+    .runner-sprite .sailor-collar,
+    .runner-sprite .leaf-mark {
+      position: absolute;
+      z-index: 6;
+      display: none;
+    }
+    .runner-sprite .patch { left: 6px; top: 18px; width: 7px; height: 6px; background: #7c5a2c; border-radius: 2px; transform: rotate(-12deg); }
+    .runner-sprite .tear { left: 14px; top: 27px; width: 5px; height: 9px; background: rgba(68, 38, 10, 0.75); clip-path: polygon(50% 0%, 100% 100%, 0% 100%); }
+    .runner-sprite .hole { left: 10px; top: 20px; width: 6px; height: 6px; background: rgba(51, 65, 85, 0.42); border-radius: 50%; }
+    .runner-sprite .body {
+      position: absolute;
+      left: 5px;
+      top: 15px;
+      width: 20px;
+      height: 25px;
+      border-radius: 8px 8px 6px 6px;
+      background: var(--shirt, #2563eb);
+      z-index: 3;
+      border: 1px solid rgba(0,0,0,0.08);
+    }
+    .runner-sprite .arm {
+      position: absolute;
+      top: 17px;
+      width: 6px;
+      height: 21px;
+      border-radius: 999px;
+      background: var(--sleeve, var(--shirt, #2563eb));
+      transform-origin: 50% 2px;
+      z-index: 2;
+      border: 1px solid rgba(0,0,0,0.06);
+      animation-play-state: paused;
+    }
+    .runner-sprite .arm::after {
+      content: '';
+      position: absolute;
+      left: -1px;
+      bottom: -4px;
+      width: 7px;
+      height: 8px;
+      background: #f4c7a1;
+      border-radius: 999px;
+    }
+    .runner-sprite .arm.left { left: 3px; z-index: 4; animation: armRearSwing var(--run-duration) infinite ease-in-out; }
+    .runner-sprite .arm.right { right: 3px; z-index: 1; animation: armFrontSwing var(--run-duration) infinite ease-in-out; }
+    .runner-sprite .leg {
+      position: absolute;
+      top: 35px;
+      width: 8px;
+      height: 28px;
+      border-radius: 999px;
+      background: var(--pants, #1e3a8a);
+      transform-origin: 50% 4px;
+      z-index: 1;
+      border: 1px solid rgba(0,0,0,0.06);
+      animation-play-state: paused;
+    }
+    .runner-sprite .leg::after {
+      content: '';
+      position: absolute;
+      left: -3px;
+      bottom: -3px;
+      width: 14px;
+      height: 6px;
+      background: var(--shoe, #111827);
+      border-radius: 8px 8px 3px 3px;
+    }
+    .runner-sprite .leg.bare::after {
+      width: 12px;
+      height: 5px;
+      left: -2px;
+      bottom: -2px;
+      background: #f1c59e;
+      border-radius: 7px 7px 4px 4px;
+      box-shadow: 1px 0 0 rgba(0,0,0,0.08);
+    }
+    .runner-sprite .leg.left { left: 6px; animation: legFront var(--run-duration) infinite linear; }
+    .runner-sprite .leg.right { right: 6px; animation: legBack var(--run-duration) infinite linear; }
+    .runner-sprite .hat {
+      left: 2px;
+      top: -2px;
+      width: 26px;
+      height: 9px;
+      background: var(--hat, #1d4ed8);
+      border-radius: 10px 10px 2px 2px;
+    }
+    .runner-sprite .hat::after {
+      content: '';
+      position: absolute;
+      left: 4px;
+      bottom: -3px;
+      width: 18px;
+      height: 4px;
+      background: var(--hat, #1d4ed8);
+      border-radius: 2px;
+    }
+    .runner-sprite .cross { left: 12px; top: 21px; width: 8px; height: 8px; }
+    .runner-sprite .cross::before,
+    .runner-sprite .cross::after { content: ''; position: absolute; background: white; border-radius: 1px; }
+    .runner-sprite .cross::before { left: 3px; top: 0; width: 2px; height: 8px; }
+    .runner-sprite .cross::after { left: 0; top: 3px; width: 8px; height: 2px; }
+    .runner-sprite .stethoscope { left: 4px; top: 14px; width: 20px; height: 16px; border: 2px solid #64748b; border-top: 0; border-radius: 0 0 10px 10px; z-index: 7; background: transparent; }
+    .runner-sprite .stethoscope-ear { left: 8px; top: 11px; width: 12px; height: 6px; border-top: 2px solid #64748b; border-left: 2px solid #64748b; border-right: 2px solid #64748b; border-radius: 8px 8px 0 0; z-index: 7; background: transparent; }
+    .runner-sprite .stethoscope-head { left: 16px; top: 27px; width: 6px; height: 6px; border-radius: 50%; background: #94a3b8; box-shadow: 0 0 0 1px rgba(71,85,105,0.3); z-index: 8; }
+    .runner-sprite .guitar { left: -4px; top: 18px; width: 18px; height: 24px; border-radius: 48% 48% 42% 42%; background: linear-gradient(180deg, #f59e0b 0%, #c2410c 100%); box-shadow: inset 0 0 0 2px rgba(120, 53, 15, 0.24), 1px 1px 0 rgba(0,0,0,0.08); transform: rotate(-18deg); z-index: 6; }
+    .runner-sprite .guitar-neck { left: 8px; top: 15px; width: 22px; height: 5px; border-radius: 3px; background: #8b5a2b; transform: rotate(-22deg); transform-origin: left center; z-index: 5; }
+    .runner-sprite .guitar-head { left: 26px; top: 7px; width: 7px; height: 7px; border-radius: 2px; background: #7c3aed; transform: rotate(-22deg); z-index: 5; }
+    .runner-sprite .guitar-hole { left: 3px; top: 27px; width: 6px; height: 6px; border-radius: 50%; background: rgba(30, 41, 59, 0.7); transform: rotate(-18deg); z-index: 7; }
+    .runner-sprite .guitar-strings { left: 8px; top: 16px; width: 17px; height: 1px; background: rgba(255,255,255,0.85); box-shadow: 0 2px 0 rgba(255,255,255,0.85), 0 4px 0 rgba(255,255,255,0.85); transform: rotate(-22deg); transform-origin: left center; z-index: 7; }
+    .runner-sprite .apron { left: 8px; top: 20px; width: 14px; height: 18px; background: rgba(255,255,255,0.95); border-radius: 3px 3px 5px 5px; box-shadow: inset 0 0 0 1px rgba(148,163,184,0.28); z-index: 6; }
+    .runner-sprite .tool { left: 1px; top: 29px; width: 18px; height: 4px; background: #8b5a2b; border-radius: 3px; transform: rotate(-66deg); transform-origin: 90% 50%; z-index: 10; }
+    .runner-sprite .tool::after { content: ''; position: absolute; left: -3px; top: -5px; width: 9px; height: 13px; background: linear-gradient(180deg, #cbd5e1 0%, #94a3b8 100%); clip-path: polygon(0 22%, 100% 0, 82% 100%, 20% 86%); border-radius: 1px; box-shadow: inset 0 0 0 1px rgba(71,85,105,0.18); }
+    .runner-sprite .helmet-band { left: 4px; top: 2px; width: 20px; height: 4px; background: rgba(15,23,42,0.25); border-radius: 3px; z-index: 7; }
+    .runner-sprite .card-mark { left: 2px; top: 24px; width: 10px; height: 14px; background: #ffffff; border-radius: 2px; transform: rotate(-16deg); box-shadow: inset 0 0 0 1px rgba(15,23,42,0.18); z-index: 7; }
+    .runner-sprite .card-mark::after { content: 'A'; position: absolute; left: 2px; top: 1px; font-size: 7px; font-weight: 700; color: #dc2626; }
+    .runner-sprite .glove { left: 1px; top: 27px; width: 8px; height: 8px; background: #22c55e; border-radius: 50%; z-index: 7; }
+    .runner-sprite .sailor-collar { left: 6px; top: 16px; width: 18px; height: 10px; background: #1d4ed8; clip-path: polygon(0 0, 100% 0, 78% 100%, 22% 100%); z-index: 5; }
+    .runner-sprite .leaf-mark { left: 15px; top: 22px; width: 8px; height: 10px; background: #22c55e; border-radius: 80% 0 80% 0; transform: rotate(28deg); z-index: 7; }
+    .runner-sprite .medal { left: 11px; top: 20px; width: 10px; height: 10px; background: #facc15; border-radius: 50%; box-shadow: 0 0 0 2px rgba(255,255,255,0.6) inset; }
+    .runner-sprite .badge-mini { left: 12px; top: 22px; width: 7px; height: 7px; background: #fbbf24; border-radius: 2px; }
+    .runner-sprite .tie { left: 12px; top: 18px; width: 0; height: 0; border-left: 4px solid transparent; border-right: 4px solid transparent; border-top: 12px solid #dc2626; }
+    .runner-sprite.police { --shirt: #b88746; --pants: #5b3a29; --sleeve: #b88746; --hat: #3b2a21; --shoe: #111827; }
+    .runner-sprite.police .body { background: linear-gradient(180deg, #c69756 0%, #a9763c 100%); box-shadow: inset 0 -4px 0 rgba(91, 58, 41, 0.16); }
+    .runner-sprite.police .hat, .runner-sprite.police .badge-mini { display: block; }
+    .runner-sprite.police .hat { left: 3px; top: -2px; width: 22px; height: 8px; border-radius: 6px 6px 2px 2px; background: #3b2a21; }
+    .runner-sprite.police .hat::after { left: 3px; bottom: -3px; width: 16px; height: 4px; background: #3b2a21; }
+    .runner-sprite.police .badge-mini { left: 12px; top: 21px; width: 7px; height: 7px; background: #facc15; border-radius: 2px; }
+    .runner-sprite.doctor { --shirt: #ffffff; --pants: #60a5fa; --sleeve: #ffffff; --shoe: #374151; }
+    .runner-sprite.doctor .cross, .runner-sprite.doctor .stethoscope, .runner-sprite.doctor .stethoscope-ear, .runner-sprite.doctor .stethoscope-head { display: block; }
+    .runner-sprite.minister { --shirt: #374151; --pants: #111827; --sleeve: #374151; --shoe: #111827; }
+    .runner-sprite.minister .tie { display: block; }
+    .runner-sprite.president { --shirt: #111827; --pants: #111827; --sleeve: #111827; --shoe: #111827; --hat: #111827; }
+    .runner-sprite.president .hat, .runner-sprite.president .medal, .runner-sprite.president .tie { display: block; }
+    .runner-sprite.president .hat { left: 5px; top: -1px; width: 19px; height: 8px; border-radius: 4px 4px 2px 2px; background: #111827; box-shadow: inset 0 -1px 0 rgba(255,255,255,0.08); }
+    .runner-sprite.president .hat::after { display: none; }
+    .runner-sprite.soldier { --shirt: #4f6b3c; --pants: #3f5532; --sleeve: #4f6b3c; --hat: #4f6b3c; --shoe: #111827; }
+    .runner-sprite.soldier .body { background: radial-gradient(circle at 30% 28%, #6b7f48 0 3px, transparent 3.5px), radial-gradient(circle at 68% 40%, #2f3f27 0 3px, transparent 3.5px), radial-gradient(circle at 52% 68%, #7b6a3b 0 3px, transparent 3.5px), linear-gradient(180deg, #5d7444 0%, #425735 100%); }
+    .runner-sprite.soldier .leg { background: radial-gradient(circle at 35% 30%, #6b7f48 0 2px, transparent 2.5px), radial-gradient(circle at 60% 62%, #2f3f27 0 2px, transparent 2.5px), linear-gradient(180deg, #526941 0%, #3d5031 100%); }
+    .runner-sprite.soldier .hat { display: block; }
+    .runner-sprite.soldier .hat { left: 2px; top: -1px; width: 24px; height: 8px; border-radius: 4px 4px 2px 2px; background: #4a6038; }
+    .runner-sprite.soldier .hat::after { left: 4px; bottom: -2px; width: 14px; height: 3px; background: #4a6038; }
+    .runner-sprite.beggar { --shirt: transparent; --pants: #6b7280; --sleeve: #f4c7a1; --shoe: transparent; }
+    .runner-sprite.beggar .body { border: 1px solid rgba(120, 85, 60, 0.18); opacity: 1; background: linear-gradient(180deg, #f4c7a1 0%, #eab38b 100%); box-shadow: inset 0 -3px 0 rgba(120, 85, 60, 0.08); border-radius: 8px 8px 10px 10px; }
+    .runner-sprite.beggar .hair { background: #52525b; width: 22px; left: 3px; height: 11px; border-radius: 10px 10px 4px 8px; }
+    .runner-sprite.beggar .arm { background: #f4c7a1; border-color: rgba(120, 85, 60, 0.18); opacity: 0.96; }
+    .runner-sprite.beggar .leg { background: linear-gradient(180deg, #7b8794 0 11px, #f1c59e 11px 100%); border-style: dashed; border-color: rgba(71, 85, 105, 0.75); }
+    .runner-sprite.beggar .leg.left, .runner-sprite.beggar .leg.right { width: 7px; }
+    .runner-sprite.beggar .leg.left::after, .runner-sprite.beggar .leg.right::after { background: #f1c59e; }
+    .runner-sprite.commoner { --shirt: #22c55e; --pants: #2563eb; --sleeve: #22c55e; --shoe: #1f2937; }
+    .runner-sprite.employee { --shirt: #0f172a; --pants: #334155; --sleeve: #0f172a; --shoe: #111827; }
+    .runner-sprite.employee .tie { display: block; }
+    .runner-sprite.employee .body { border-radius: 6px; }
+    .runner-sprite.civil-servant { --shirt: #c9ab74; --pants: #9d7c4d; --sleeve: #c9ab74; --shoe: #3f3f46; --hat: #9d7c4d; }
+    .runner-sprite.civil-servant .body { background: linear-gradient(180deg, #d4b887 0%, #bea06a 100%); box-shadow: inset 0 -4px 0 rgba(120, 85, 40, 0.12); }
+    .runner-sprite.civil-servant .tie { display: block; border-top-color: #7c2d12; top: 19px; }
+    .runner-sprite.civil-servant .badge-mini, .runner-sprite.civil-servant .hat { display: block; }
+    .runner-sprite.civil-servant .hat { left: 4px; top: -1px; width: 20px; height: 7px; border-radius: 4px 4px 2px 2px; background: #8b6b3f; }
+    .runner-sprite.civil-servant .hat::after { left: 3px; bottom: -2px; width: 14px; height: 3px; background: #8b6b3f; }
+    .runner-sprite.civil-servant .badge-mini { left: 13px; top: 21px; width: 6px; height: 6px; background: #facc15; border-radius: 2px; }
+    .runner-sprite.astronaut { --shirt: #e5e7eb; --pants: #cbd5e1; --sleeve: #e5e7eb; --shoe: #94a3b8; --hat: #d1d5db; }
+    .runner-sprite.astronaut .head { background: #dbeafe; box-shadow: inset 0 0 0 4px rgba(255,255,255,0.85); }
+    .runner-sprite.astronaut .hair { display: none; }
+    .runner-sprite.astronaut .hat { display: block; left: 0; top: -3px; width: 30px; height: 22px; border-radius: 50%; background: rgba(226,232,240,0.78); border: 2px solid #94a3b8; box-shadow: inset 0 0 0 3px rgba(255,255,255,0.7); }
+    .runner-sprite.astronaut .hat::after { display: none; }
+    .runner-sprite.astronaut .body { background: linear-gradient(180deg, #f8fafc 0%, #dbe4ee 100%); }
+    .runner-sprite.businessman { --shirt: #111827; --pants: #1f2937; --sleeve: #111827; --shoe: #111827; }
+    .runner-sprite.businessman .tie, .runner-sprite.businessman .medal { display: block; }
+    .runner-sprite.businessman .medal { background: #f59e0b; width: 8px; height: 8px; left: 17px; top: 19px; }
+    .runner-sprite.nurse { --shirt: #f8fafc; --pants: #fda4af; --sleeve: #f8fafc; --shoe: #475569; --hat: #ffffff; }
+    .runner-sprite.nurse .cross, .runner-sprite.nurse .hat { display: block; }
+    .runner-sprite.nurse .hat { left: 5px; top: -2px; width: 18px; height: 7px; border-radius: 4px 4px 1px 1px; background: #ffffff; border: 1px solid rgba(148,163,184,0.5); }
+    .runner-sprite.nurse .hat::after { display: none; }
+    .runner-sprite.nurse .cross { top: 22px; }
+    .runner-sprite.punk { --shirt: #111827; --pants: #7c3aed; --sleeve: #111827; --shoe: #111827; }
+    .runner-sprite.punk .hair { left: 9px; top: -8px; width: 10px; height: 18px; background: #ef4444; border-radius: 3px 3px 1px 1px; clip-path: polygon(50% 0%, 100% 100%, 0% 100%); }
+    .runner-sprite.punk .body { background: linear-gradient(180deg, #1f2937 0%, #111827 100%); box-shadow: inset 0 -4px 0 rgba(124,58,237,0.3); }
+    .runner-sprite.musician { --shirt: #7c3aed; --pants: #1e293b; --sleeve: #7c3aed; --shoe: #111827; }
+    .runner-sprite.musician .tie, .runner-sprite.musician .badge-mini, .runner-sprite.musician .guitar, .runner-sprite.musician .guitar-neck, .runner-sprite.musician .guitar-head, .runner-sprite.musician .guitar-hole, .runner-sprite.musician .guitar-strings { display: block; }
+    .runner-sprite.musician .tie { border-top-color: #f43f5e; }
+    .runner-sprite.musician .badge-mini { background: #22c55e; left: 8px; top: 24px; }
+    .runner-sprite.chef { --shirt: #ffffff; --pants: #374151; --sleeve: #ffffff; --shoe: #111827; --hat: #ffffff; }
+    .runner-sprite.chef .hat, .runner-sprite.chef .apron { display: block; }
+    .runner-sprite.chef .hat { left: 2px; top: -6px; width: 24px; height: 14px; border-radius: 50% 50% 35% 35%; background: #ffffff; box-shadow: inset 0 -2px 0 rgba(148,163,184,0.2); }
+    .runner-sprite.chef .hat::after { left: 4px; bottom: -2px; width: 16px; height: 4px; background: #ffffff; }
+    .runner-sprite.carpenter { --shirt: #c2410c; --pants: #334155; --sleeve: #c2410c; --shoe: #111827; }
+    .runner-sprite.carpenter .arm.left { z-index: 11; }
+    .runner-sprite.carpenter .arm.left::after { width: 8px; height: 9px; left: -1px; bottom: -4px; }
+    .runner-sprite.carpenter .tool { display: block; }
+    .runner-sprite.engineer { --shirt: #f59e0b; --pants: #475569; --sleeve: #f59e0b; --shoe: #111827; --hat: #facc15; }
+    .runner-sprite.engineer .hat, .runner-sprite.engineer .helmet-band { display: block; }
+    .runner-sprite.engineer .hat { left: 3px; top: -2px; width: 22px; height: 8px; border-radius: 8px 8px 2px 2px; background: #facc15; }
+    .runner-sprite.engineer .hat::after { left: 3px; bottom: -2px; width: 16px; height: 3px; background: #facc15; }
+    .runner-sprite.sailor { --shirt: #ffffff; --pants: #1d4ed8; --sleeve: #ffffff; --shoe: #111827; --hat: #ffffff; }
+    .runner-sprite.sailor .hat, .runner-sprite.sailor .sailor-collar { display: block; }
+    .runner-sprite.sailor .hat { left: 4px; top: -2px; width: 20px; height: 7px; border-radius: 4px 4px 2px 2px; background: #ffffff; box-shadow: inset 0 -1px 0 rgba(29,78,216,0.18); }
+    .runner-sprite.sailor .hat::after { left: 3px; bottom: -2px; width: 14px; height: 3px; background: #1d4ed8; }
+    .runner-sprite.gambler { --shirt: #7c2d12; --pants: #111827; --sleeve: #7c2d12; --shoe: #111827; }
+    .runner-sprite.gambler .card-mark, .runner-sprite.gambler .tie { display: block; }
+    .runner-sprite.gardener { --shirt: #16a34a; --pants: #6b7280; --sleeve: #16a34a; --shoe: #111827; --hat: #15803d; }
+    .runner-sprite.gardener .hat, .runner-sprite.gardener .glove, .runner-sprite.gardener .leaf-mark { display: block; }
+    .runner-sprite.gardener .hat { left: 2px; top: -2px; width: 24px; height: 7px; border-radius: 6px 6px 2px 2px; background: #166534; }
+    .runner-sprite.gardener .hat::after { left: 1px; bottom: -2px; width: 20px; height: 3px; background: #166534; }
+    .runner.running .runner-sprite .torso-wrap { animation: bodyBounce var(--run-duration) infinite linear; animation-play-state: running; }
+    .runner.running .runner-sprite .arm.left { animation: armRearSwing var(--run-duration) infinite ease-in-out; animation-play-state: running; }
+    .runner.running .runner-sprite .arm.right { animation: armFrontSwing var(--run-duration) infinite ease-in-out; animation-play-state: running; }
+    .runner.running .runner-sprite .leg.left { animation: legFront var(--run-duration) infinite linear; animation-play-state: running; }
+    .runner.running .runner-sprite .leg.right { animation: legBack var(--run-duration) infinite linear; animation-play-state: running; }
+    .runner.running .runner-sprite .shadow { animation: shadowRun var(--run-duration) infinite linear; animation-play-state: running; }
+    .runner.running .runner-sprite.carpenter .tool { animation: axeSwing var(--run-duration) infinite ease-in-out; animation-play-state: running; }
+    .runner:not(.running) .runner-sprite.carpenter .tool { animation: none; transform: rotate(-66deg); }
+    @keyframes bodyBounce {
+      0%, 100% { transform: translateY(0) rotate(1deg); }
+      25% { transform: translateY(2px) rotate(-1deg); }
+      50% { transform: translateY(1px) rotate(1deg); }
+      75% { transform: translateY(2px) rotate(-1deg); }
+    }
+    @keyframes armFrontSwing {
+      0% { transform: rotate(-30deg) translateY(1px); }
+      25% { transform: rotate(-8deg) translateY(0); }
+      50% { transform: rotate(46deg) translateY(-1px); }
+      75% { transform: rotate(12deg) translateY(0); }
+      100% { transform: rotate(-30deg) translateY(1px); }
+    }
+    @keyframes armRearSwing {
+      0% { transform: rotate(46deg) translateY(-1px); }
+      25% { transform: rotate(12deg) translateY(0); }
+      50% { transform: rotate(-30deg) translateY(1px); }
+      75% { transform: rotate(-8deg) translateY(0); }
+      100% { transform: rotate(46deg) translateY(-1px); }
+    }
+    @keyframes legFront {
+      0% { transform: rotate(-28deg) translateY(2px); }
+      25% { transform: rotate(-8deg) translateY(1px); }
+      50% { transform: rotate(34deg) translateY(0); }
+      75% { transform: rotate(10deg) translateY(1px); }
+      100% { transform: rotate(-28deg) translateY(2px); }
+    }
+    @keyframes legBack {
+      0% { transform: rotate(34deg) translateY(0); }
+      25% { transform: rotate(10deg) translateY(1px); }
+      50% { transform: rotate(-28deg) translateY(2px); }
+      75% { transform: rotate(-8deg) translateY(1px); }
+      100% { transform: rotate(34deg) translateY(0); }
+    }
+    @keyframes shadowRun {
+      0%, 100% { transform: scaleX(1); opacity: 0.18; }
+      50% { transform: scaleX(0.82); opacity: 0.12; }
+    }
+    @keyframes axeSwing {
+      0% { transform: rotate(-78deg) translateY(0); }
+      50% { transform: rotate(-56deg) translateY(-1px); }
+      100% { transform: rotate(-78deg) translateY(0); }
+    }
+    @keyframes winnerSpin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+    @keyframes confettiDrop {
+      0% { transform: translateY(-20px) rotate(0deg); opacity: 0; }
+      10% { opacity: 1; }
+      100% { transform: translateY(340px) rotate(220deg); opacity: 0; }
+    }
+    .duck-name {
+      position: absolute;
+      left: 50%;
+      top: 36px;
+      transform: translateX(-50%);
+      max-width: 54px;
+      padding: 2px 4px;
+      border-radius: 6px;
+      font-size: 9px;
+      line-height: 1.1;
+      font-weight: 700;
+      text-align: center;
+      color: #ffffff;
+      background: rgba(15, 23, 42, 0.55);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.18);
+      z-index: 10;
+      pointer-events: none;
+    }
+    .chat-bubble {
+      position: absolute;
+      left: 50%;
+      bottom: 76px;
+      transform: translateX(-50%) scale(0.92);
+      min-width: 74px;
+      max-width: 130px;
+      padding: 6px 8px;
+      border-radius: 12px;
+      background: rgba(255,255,255,0.96);
+      color: #111827;
+      font-size: 10px;
+      line-height: 1.25;
+      text-align: center;
+      box-shadow: 0 6px 18px rgba(15,23,42,0.16);
+      border: 1px solid rgba(191,219,254,0.9);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.18s ease, transform 0.18s ease;
+      z-index: 50;
+    }
+    .chat-bubble::after {
+      content: '';
+      position: absolute;
+      left: 50%;
+      bottom: -6px;
+      width: 10px;
+      height: 10px;
+      background: rgba(255,255,255,0.96);
+      border-right: 1px solid rgba(191,219,254,0.9);
+      border-bottom: 1px solid rgba(191,219,254,0.9);
+      transform: translateX(-50%) rotate(45deg);
+    }
+    .chat-bubble.show { opacity: 1; transform: translateX(-50%) scale(1); }
+    .winner-box {
+      margin-top: 16px;
+      padding: 16px;
+      border-radius: 14px;
+      background: #fefce8;
+      border: 1px solid #fde68a;
+      min-height: 68px;
+      display: flex;
+      align-items: center;
+      font-weight: 700;
+      color: #854d0e;
+    }
+    .winner-popup {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      background: rgba(15, 23, 42, 0.58);
+      backdrop-filter: blur(4px);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.22s ease;
+      z-index: 999;
+    }
+    .winner-popup.show { opacity: 1; pointer-events: auto; }
+    .winner-popup-card {
+      position: relative;
+      width: min(520px, 100%);
+      padding: 120px 24px 22px;
+      margin-top: 110px;
+      border-radius: 24px;
+      background: linear-gradient(180deg, #fffdf2 0%, #ffffff 100%);
+      border: 2px solid #fde68a;
+      box-shadow: 0 20px 60px rgba(15, 23, 42, 0.28);
+      text-align: center;
+      overflow: visible;
+      transform: translateY(12px) scale(0.96);
+      transition: transform 0.22s ease;
+    }
+    .winner-popup.show .winner-popup-card { transform: translateY(0) scale(1); }
+    .winner-burst {
+      position: absolute;
+      inset: -30px;
+      border-radius: 24px;
+      overflow: hidden;
+      background:
+        radial-gradient(circle at 50% 50%, rgba(250,204,21,0.28) 0 18%, transparent 19%),
+        conic-gradient(from 0deg, rgba(245,158,11,0) 0deg, rgba(245,158,11,0.35) 35deg, rgba(245,158,11,0) 70deg, rgba(245,158,11,0.35) 105deg, rgba(245,158,11,0) 140deg, rgba(245,158,11,0.35) 175deg, rgba(245,158,11,0) 210deg, rgba(245,158,11,0.35) 245deg, rgba(245,158,11,0) 280deg, rgba(245,158,11,0.35) 315deg, rgba(245,158,11,0) 360deg);
+      opacity: 0.9;
+      animation: winnerSpin 7s linear infinite;
+      pointer-events: none;
+    }
+    .winner-popup h2 {
+      position: relative;
+      margin: 0 0 8px;
+      font-size: 32px;
+      color: #92400e;
+      z-index: 1;
+    }
+    .winner-avatar {
+      position: absolute;
+      top: -110px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 220px;
+      height: 220px;
+      border-radius: 50%;
+      object-fit: cover;
+      border: 8px solid #fcd34d;
+      box-shadow: 0 8px 32px rgba(245, 158, 11, 0.45);
+      background: #fffdf2;
+      z-index: 10;
+    }
+    .winner-role-label {
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 8px 14px;
+      border-radius: 999px;
+      font-size: 13px;
+      font-weight: 700;
+      color: #92400e;
+      background: #fef3c7;
+      border: 1px solid #fcd34d;
+      z-index: 1;
+    }
+    .winner-name {
+      position: relative;
+      margin: 14px 0 10px;
+      font-size: 22px;
+      font-weight: 800;
+      color: #111827;
+      z-index: 1;
+    }
+    .winner-quote {
+      position: relative;
+      margin: 0;
+      padding: 14px 16px;
+      border-radius: 16px;
+      background: rgba(255,255,255,0.92);
+      border: 1px solid #fde68a;
+      color: #374151;
+      font-size: 15px;
+      line-height: 1.6;
+      z-index: 1;
+    }
+    .winner-close { position: relative; margin-top: 16px; z-index: 1; }
+    .winner-confetti { position: absolute; inset: 0; pointer-events: none; overflow: hidden; z-index: 0; }
+    .winner-confetti span {
+      position: absolute;
+      top: -16px;
+      width: 10px;
+      height: 18px;
+      border-radius: 4px;
+      opacity: 0.95;
+      animation: confettiDrop 2.7s linear infinite;
+    }
+    .winner-confetti span:nth-child(1) { left: 8%; background: #f59e0b; animation-delay: 0s; }
+    .winner-confetti span:nth-child(2) { left: 17%; background: #22c55e; animation-delay: 0.3s; }
+    .winner-confetti span:nth-child(3) { left: 28%; background: #60a5fa; animation-delay: 0.6s; }
+    .winner-confetti span:nth-child(4) { left: 39%; background: #f43f5e; animation-delay: 0.15s; }
+    .winner-confetti span:nth-child(5) { left: 52%; background: #a78bfa; animation-delay: 0.45s; }
+    .winner-confetti span:nth-child(6) { left: 63%; background: #f59e0b; animation-delay: 0.8s; }
+    .winner-confetti span:nth-child(7) { left: 74%; background: #22c55e; animation-delay: 0.2s; }
+    .winner-confetti span:nth-child(8) { left: 85%; background: #60a5fa; animation-delay: 0.7s; }
+    .footer-note { margin-top: 12px; font-size: 13px; color: #6b7280; }
+    .character-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 16px;
+      margin-top: 16px;
+    }
+    .character-card {
+      background: #f8fbff;
+      border: 1px solid #dbeafe;
+      border-radius: 16px;
+      padding: 16px;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+    .character-card .runner-sprite { margin: 0 auto 10px; }
+    .character-card h3 { margin: 8px 0 4px; font-size: 16px; }
+    .character-card .runner-sprite .arm,
+    .character-card .runner-sprite .leg,
+    .character-card .runner-sprite .torso-wrap,
+    .character-card .runner-sprite .shadow { animation-play-state: running; }
+    @media (max-width: 900px) {
+      .grid { grid-template-columns: 1fr; }
+      .container { padding: 12px; }
+      .header { padding: 16px; }
+      .header h1 { font-size: 24px; }
+      .header p { font-size: 13px; }
+      .grid { padding: 12px; gap: 12px; }
+      .panel { padding: 14px; }
+      textarea { min-height: 120px; }
+      .race-wrapper { padding: 10px; min-height: 400px; }
+      .track { height: 380px; min-height: 380px; }
+      .badge { padding: 6px 10px; font-size: 11px; }
+      .winner-popup-card { padding: 100px 16px 18px; margin-top: 90px; }
+      .winner-avatar { width: 180px; height: 180px; top: -90px; }
+      .winner-popup h2 { font-size: 26px; }
+      .winner-name { font-size: 18px; }
+      .winner-quote { font-size: 13px; padding: 10px 12px; }
+    }
+    @media (max-width: 600px) {
+      .container { padding: 8px; }
+      .header { padding: 12px; }
+      .header h1 { font-size: 20px; }
+      .header p { font-size: 12px; }
+      .grid { padding: 10px; gap: 10px; }
+      .panel { padding: 10px; }
+      .panel h2 { font-size: 16px; }
+      textarea { min-height: 100px; font-size: 13px; }
+      button { padding: 10px 12px; font-size: 13px; }
+      .race-wrapper { padding: 8px; min-height: 340px; }
+      .track { height: 320px; min-height: 320px; }
+      .track-header { gap: 6px; margin-bottom: 8px; }
+      .badge { padding: 5px 8px; font-size: 10px; }
+      .runner { width: 56px; height: 66px; }
+      .runner-sprite { width: 56px; height: 66px; transform: scale(0.78); transform-origin: top left; }
+      .chat-bubble { font-size: 9px; min-width: 60px; max-width: 100px; bottom: 60px; }
+      .duck-name { font-size: 9px; }
+      .winner-popup { padding: 12px; }
+      .winner-popup-card { padding: 80px 12px 16px; margin-top: 70px; width: min(360px, 100%); }
+      .winner-avatar { width: 140px; height: 140px; top: -70px; border: 6px solid #fcd34d; }
+      .winner-popup h2 { font-size: 22px; }
+      .winner-role-label { font-size: 11px; padding: 6px 10px; }
+      .winner-name { font-size: 16px; margin: 10px 0 8px; }
+      .winner-quote { font-size: 12px; padding: 10px; }
+      .winner-close { margin-top: 12px; }
+      .character-grid { grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; }
+      .character-card { padding: 10px; }
+      .top-nav { gap: 6px; }
+      .nav-btn { padding: 10px 12px; font-size: 13px; }
+      .hint, .footer-note { font-size: 11px; }
+      .spectator-area { height: 40px; }
+      .spectator-row.row-back { bottom: 16px; }
+      .spectator-row.row-mid { bottom: 8px; }
+    }
+    @media (max-width: 400px) {
+      .header h1 { font-size: 18px; }
+      .track { height: 280px; min-height: 280px; }
+      .winner-popup-card { padding: 70px 10px 14px; margin-top: 60px; }
+      .winner-avatar { width: 120px; height: 120px; top: -60px; }
+      .winner-popup h2 { font-size: 20px; }
+    }
+
+    /* ── Disco Lights ── */
+    .disco-lights {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      pointer-events: none;
+      overflow: hidden;
+    }
+    .disco-beam {
+      position: absolute;
+      top: -20%;
+      width: 8%;
+      height: 120%;
+      opacity: 0.12;
+      filter: blur(24px);
+      will-change: transform, opacity;
+      transform-origin: top center;
+      animation: discoSweep 4s ease-in-out infinite alternate;
+    }
+    .disco-beam:nth-child(1) { left: 5%; background: #ff0055; animation-delay: 0s; animation-duration: 3.5s; }
+    .disco-beam:nth-child(2) { left: 20%; background: #00ffaa; animation-delay: 0.5s; animation-duration: 4.2s; }
+    .disco-beam:nth-child(3) { left: 35%; background: #3366ff; animation-delay: 1s; animation-duration: 3.8s; }
+    .disco-beam:nth-child(4) { left: 50%; background: #ff00ff; animation-delay: 0.3s; animation-duration: 4.5s; }
+    .disco-beam:nth-child(5) { left: 65%; background: #ffaa00; animation-delay: 0.8s; animation-duration: 3.2s; }
+    .disco-beam:nth-child(6) { left: 80%; background: #00ccff; animation-delay: 1.2s; animation-duration: 4s; }
+    .disco-beam:nth-child(7) { left: 92%; background: #ff3366; animation-delay: 0.6s; animation-duration: 3.6s; }
+
+    @keyframes discoSweep {
+      0% { transform: rotate(-25deg) scaleX(1); opacity: 0.08; }
+      50% { transform: rotate(0deg) scaleX(1.5); opacity: 0.15; }
+      100% { transform: rotate(25deg) scaleX(1); opacity: 0.08; }
+    }
+
+    .disco-ball {
+      position: absolute;
+      border-radius: 50%;
+      filter: blur(30px);
+      will-change: transform, opacity;
+      animation: discoPulse 3s ease-in-out infinite alternate;
+    }
+    .disco-ball:nth-child(8) { width: 300px; height: 300px; top: 10%; left: 10%; background: rgba(255,0,100,0.1); animation-delay: 0s; }
+    .disco-ball:nth-child(9) { width: 250px; height: 250px; top: 50%; right: 15%; background: rgba(0,150,255,0.1); animation-delay: 1s; }
+    .disco-ball:nth-child(10) { width: 200px; height: 200px; bottom: 10%; left: 40%; background: rgba(150,0,255,0.1); animation-delay: 0.5s; }
+    .disco-ball:nth-child(11) { width: 280px; height: 280px; top: 30%; right: 40%; background: rgba(255,200,0,0.08); animation-delay: 1.5s; }
+
+    @keyframes discoPulse {
+      0% { transform: scale(1); opacity: 0.6; }
+      100% { transform: scale(1.4); opacity: 1; }
+    }
+
+    /* ── Side Slides ── */
+    .side-slide {
+      position: fixed;
+      top: 0;
+      width: 260px;
+      z-index: 2;
+      pointer-events: none;
+      overflow: hidden;
+      height: 100vh;
+    }
+    .side-slide.left { left: 10px; }
+    .side-slide.right { right: 10px; }
+
+    .side-slide-track {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      padding: 10px;
+      will-change: transform;
+    }
+    .side-slide-track {
+      animation: none;
+    }
+
+    .slide-card {
+      position: relative;
+      border-radius: 16px;
+      padding: 3px;
+      flex-shrink: 0;
+      background: linear-gradient(-30deg, rgba(221,132,72,0.4), transparent, rgba(221,132,72,0.4)),
+                  linear-gradient(to bottom, #1a1a2e, #1a1a2e);
+    }
+    .slide-card-inner {
+      position: relative;
+      border-radius: 14px;
+      overflow: hidden;
+      border: 2px solid rgba(221,132,72,0.5);
+    }
+    .slide-card-inner img {
+      display: block;
+      width: 100%;
+      height: auto;
+      border-radius: 12px;
+    }
+    .slide-card-glow {
+      position: absolute;
+      inset: -2px;
+      border-radius: 16px;
+      border: 2px solid rgba(221,132,72,0.6);
+      filter: blur(4px);
+      pointer-events: none;
+    }
+    .slide-card-filter {
+      position: absolute;
+      inset: 0;
+      border-radius: 14px;
+      border: 2px solid #dd8448;
+      filter: url(#sideSwirl);
+      pointer-events: none;
+    }
+
+    @media (min-width: 1800px) {
+      .side-slide.left { left: calc((100vw - 1500px) / 2 / 2 - 130px); }
+      .side-slide.right { right: calc((100vw - 1500px) / 2 / 2 - 130px); }
+    }
+    @media (max-width: 1600px) {
+      .side-slide { width: 180px; }
+    }
+    @media (max-width: 1400px) {
+      .side-slide { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <canvas id="vortexCanvas"></canvas>
+
+  <!-- Disco Lights -->
+  <div class="disco-lights">
+    <div class="disco-beam"></div>
+    <div class="disco-beam"></div>
+    <div class="disco-beam"></div>
+    <div class="disco-beam"></div>
+    <div class="disco-beam"></div>
+    <div class="disco-beam"></div>
+    <div class="disco-beam"></div>
+    <div class="disco-ball"></div>
+    <div class="disco-ball"></div>
+    <div class="disco-ball"></div>
+    <div class="disco-ball"></div>
+  </div>
+
+  <!-- SVG filter for electric effect on side cards -->
+  <svg style="position:absolute;width:0;height:0;overflow:hidden" aria-hidden="true">
+    <defs>
+      <filter id="sideSwirl" colorInterpolationFilters="sRGB" x="-20%" y="-20%" width="140%" height="140%">
+        <feTurbulence type="turbulence" baseFrequency="0.02" numOctaves="4" result="n1" seed="1"/>
+        <feOffset in="n1" dx="0" dy="0" result="o1">
+          <animate attributeName="dy" values="700;0" dur="6s" repeatCount="indefinite" calcMode="linear"/>
+        </feOffset>
+        <feTurbulence type="turbulence" baseFrequency="0.02" numOctaves="4" result="n2" seed="1"/>
+        <feOffset in="n2" dx="0" dy="0" result="o2">
+          <animate attributeName="dy" values="0;-700" dur="6s" repeatCount="indefinite" calcMode="linear"/>
+        </feOffset>
+        <feTurbulence type="turbulence" baseFrequency="0.02" numOctaves="4" result="n3" seed="2"/>
+        <feOffset in="n3" dx="0" dy="0" result="o3">
+          <animate attributeName="dx" values="490;0" dur="6s" repeatCount="indefinite" calcMode="linear"/>
+        </feOffset>
+        <feTurbulence type="turbulence" baseFrequency="0.02" numOctaves="4" result="n4" seed="2"/>
+        <feOffset in="n4" dx="0" dy="0" result="o4">
+          <animate attributeName="dx" values="0;-490" dur="6s" repeatCount="indefinite" calcMode="linear"/>
+        </feOffset>
+        <feComposite in="o1" in2="o2" result="p1"/>
+        <feComposite in="o3" in2="o4" result="p2"/>
+        <feBlend in="p1" in2="p2" mode="color-dodge" result="combined"/>
+        <feDisplacementMap in="SourceGraphic" in2="combined" scale="20" xChannelSelector="R" yChannelSelector="B"/>
+      </filter>
+    </defs>
+  </svg>
+
+  <!-- Side Slides -->
+  <div class="side-slide left" id="sideSlideLeft"></div>
+  <div class="side-slide right" id="sideSlideRight"></div>
+
+  <div class="container">
+    <div class="top-nav">
+      <button id="showRacePage" class="secondary nav-btn active" type="button">Race</button>
+      <button id="showCharacterPage" class="secondary nav-btn" type="button">Character</button>
+    </div>
+
+    <div id="racePage" class="page active">
+      <div class="card">
+        <div class="header">
+          <h1>Race Pinggir Jurang</h1>
+          <p>Masukkan nama peserta, lalu tekan <b>Mulai Race</b>. Pemenang ditentukan dari pelari yang mencapai garis finish lebih dulu.</p>
+        </div>
+
+        <div class="grid">
+          <div class="panel">
+            <h2>Peserta</h2>
+            <textarea id="participantsInput" placeholder="Contoh:&#10;Chris&#10;Budi&#10;Sinta&#10;Aldi&#10;Rina">Anto
+Yokho
+Nald
+Chow
+Hencux
+Pohan
+Budi
+Robby
+Andre
+Bahlul</textarea>
+            <div class="hint">Satu nama per baris. Minimal 2 peserta, maksimal 100 peserta.</div>
+            <div class="actions">
+              <button class="primary" id="buildBtn" type="button">Buat Arena</button>
+              <button class="accent" id="startBtn" type="button">Mulai Race</button>
+              <button class="secondary" id="resetBtn" type="button">Reset</button>
+            </div>
+            <div class="winner-box" id="winnerBox">Belum ada pemenang. Siapkan peserta dulu.</div>
+            <div class="footer-note" style="margin-top:14px; font-style:italic; opacity:0.75;">Disclaimer: Game ini dibuat murni untuk hiburan dan bersenang-senang. Tidak ada unsur SARA, perjudian, atau niat menyinggung pihak manapun.</div>
+          </div>
+
+          <div class="race-wrapper">
+            <div class="track-header">
+              <div class="badge" id="statusBadge">Status: siap</div>
+              <div class="badge" id="timerBadge">Waktu: 00:00</div>
+              <div class="badge" id="participantCount">Peserta: 0</div>
+            </div>
+            <div class="track" id="track"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="characterPage" class="page">
+      <div class="character-page-card">
+        <h2>Jenis Character</h2>
+        <p class="hint">Halaman ini menampilkan semua karakter yang tersedia untuk race.</p>
+        <div class="character-grid" id="characterGrid"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="winner-popup" id="winnerPopup">
+    <div class="winner-popup-card">
+      <img class="winner-avatar" id="winnerAvatar" src="" alt="Winner" />
+      <div class="winner-burst"></div>
+      <div class="winner-confetti">
+        <span></span><span></span><span></span><span></span>
+        <span></span><span></span><span></span><span></span>
+      </div>
+      <h2>🏆 Pemenang!</h2>
+      <div class="winner-role-label" id="winnerRoleLabel">Profesi Juara</div>
+      <div class="winner-name" id="winnerNameText">Nama Pemenang</div>
+      <p class="winner-quote" id="winnerQuoteText">Teriakan kemenangan akan muncul di sini.</p>
+      <button class="secondary winner-close" id="winnerCloseBtn" type="button">Tutup</button>
+    </div>
+  </div>
+
+  <script>
+    'use strict';
+
+    (() => {
+      // ── Utilities ──
+      const clamp = (val, min, max) => Math.min(max, Math.max(min, val));
+      const randomFrom = (arr) => arr[Math.floor(Math.random() * arr.length)];
+      const randomBetween = (min, max) => min + Math.random() * (max - min);
+      const escapeAttr = (str) => str.replace(/&/g, '&amp;').replace(/"/g, '&quot;');
+
+      // ── DOM References ──
+      const dom = {
+        participantsInput: document.getElementById('participantsInput'),
+        buildBtn: document.getElementById('buildBtn'),
+        startBtn: document.getElementById('startBtn'),
+        resetBtn: document.getElementById('resetBtn'),
+        track: document.getElementById('track'),
+        winnerBox: document.getElementById('winnerBox'),
+        statusBadge: document.getElementById('statusBadge'),
+        participantCount: document.getElementById('participantCount'),
+        timerBadge: document.getElementById('timerBadge'),
+        racePage: document.getElementById('racePage'),
+        characterPage: document.getElementById('characterPage'),
+        showRacePageBtn: document.getElementById('showRacePage'),
+        showCharacterPageBtn: document.getElementById('showCharacterPage'),
+        characterGrid: document.getElementById('characterGrid'),
+        winnerPopup: document.getElementById('winnerPopup'),
+        winnerRoleLabel: document.getElementById('winnerRoleLabel'),
+        winnerNameText: document.getElementById('winnerNameText'),
+        winnerQuoteText: document.getElementById('winnerQuoteText'),
+        winnerCloseBtn: document.getElementById('winnerCloseBtn'),
+        winnerAvatar: document.getElementById('winnerAvatar'),
+      };
+
+      // ── Constants ──
+      const getTrackHeight = () => {
+        const w = window.innerWidth;
+        if (w <= 400) return 280;
+        if (w <= 600) return 320;
+        if (w <= 900) return 380;
+        if (w >= 1900) return 560;
+        return 500;
+      };
+      const TRACK = {
+        get HEIGHT() { return getTrackHeight(); },
+        SAFE_TOP: 58,
+        SAFE_BOTTOM: 20,
+        MIN_LANE_HEIGHT: 12,
+        WORLD_WIDTH: 8300,
+      };
+
+      const RACE = {
+        CAMERA_LEAD: 220,
+        START_X: 16,
+        FINISH_RIGHT_OFFSET: 48,
+        FINISH_LINE_WIDTH: 18,
+        RUNNER_CENTER_OFFSET: 35,
+        TARGET_SECONDS: 30,
+        RUNNER_HALF_HEIGHT: 41,
+      };
+
+      const FATIGUE = {
+        MAX: 10,
+        PENALTY_MS: 8000,
+        ADRENALINE_MS: 5000,
+      };
+
+      const TIMING = {
+        SPEED_CHANGE_MIN_MS: 700,
+        SPEED_CHANGE_MAX_MS: 1600,
+        CHAT_DELAY_MS: 5000,
+        CHAT_VISIBLE_MS: 2000,
+        CHAT_MAX_PER_RACER: 8,
+        CHAT_MAX_VISIBLE: 5,
+        CHAT_START_MIN_MS: 1000,
+        CHAT_START_MAX_MS: 10000,
+      };
+
+      const SPEEDS = {
+        slow:         { pixelsPerSecond: 170, fatigueDelta: 2,  animFactor: 0.72 },
+        slightlySlow: { pixelsPerSecond: 205, fatigueDelta: 1,  animFactor: 0.82 },
+        medium:       { pixelsPerSecond: 245, fatigueDelta: -1, animFactor: 1 },
+        slightlyFast: { pixelsPerSecond: 285, fatigueDelta: -1, animFactor: 1.12 },
+        fast:         { pixelsPerSecond: 325, fatigueDelta: -2, animFactor: 1.25 },
+        veryFast:     { pixelsPerSecond: 370, fatigueDelta: -3, animFactor: 1.42 },
+      };
+
+      const SPEED_NAMES = Object.keys(SPEEDS);
+
+      const CHARACTERS = [
+        'president', 'doctor', 'minister', 'commoner', 'beggar',
+      ];
+
+      const CHARACTER_IMAGES = {
+        president: ['assets/image/president-1.webp', 'assets/image/president-2.png'],
+        doctor: ['assets/image/dokter-1.webp'],
+        minister: ['assets/image/mentri-1.png', 'assets/image/mentri-2.png'],
+        commoner: ['assets/image/commoner-1.webp'],
+        beggar: ['assets/image/beggar-1.webp'],
+      };
+
+      const CHARACTER_SOUNDS = {
+        president: ['assets/sound/president/president-1.mp3', 'assets/sound/president/president-2.mp3'],
+        doctor: ['assets/sound/doctor/doctor-1.mp3', 'assets/sound/doctor/doctor-2.mp3'],
+        minister: ['assets/sound/minister/minister-1.mp3', 'assets/sound/minister/minister-2.mp3'],
+        commoner: ['assets/sound/commoner/commoner-1.mp3', 'assets/sound/commoner/commoner-2.mp3', 'assets/sound/commoner/commoner-3.mp3'],
+        beggar: ['assets/sound/beggar/beggar-1.mp3', 'assets/sound/beggar/beggar-2.mp3', 'assets/sound/beggar/beggar-3.mp3'],
+      };
+
+      // ── Character Data ──
+      const CHARACTER_INFO = {
+        police: { title: 'Polisi', description: 'Katanya pelayan masyarakat, tapi aura "kalau tidak ada pelicin urusan jadi licin" masih sering jadi bahan bercanda rakyat.' },
+        doctor: { title: 'Dokter', description: 'Muka tenang, tulisan resep seperti sandi perang, dan pasien tetap mengangguk seolah mengerti semuanya.' },
+        minister: { title: 'Mentri', description: 'Jago rapat, jago janji, dan kadang lebih cepat bikin slogan daripada bikin hasil.' },
+        president: { title: 'Presiden', description: 'Tampil rapi, penuh wibawa, dan setiap keputusan selalu disambut setengah tepuk tangan setengah debat warung kopi.' },
+        soldier: { title: 'Tentara', description: 'Langkah tegap, tatapan tajam, dan vibe "siap komandan" yang bikin orang otomatis pengin berdiri lebih lurus.' },
+        beggar: { title: 'Pengemis', description: 'Modal wajah memelas, strategi senyum tipis, dan kadang lebih lihai baca belas kasihan daripada sales baca target.' },
+        commoner: { title: 'Orang Biasa', description: 'Pahlawan negara paling realistis: kerja, bayar tagihan, ngeluh sebentar, lalu besok diulang lagi.' },
+        employee: { title: 'Karyawan', description: 'Datang pagi, pulang petang, lalu pura-pura kuat saat dengar kalimat sakral: "tolong bantu sedikit ya".' },
+        'civil-servant': { title: 'Pegawai Negeri Sipil', description: 'Seragam rapi, map di tangan, dan stereotype "pelan tapi pasti... atau pelan saja" yang sudah terlalu lama hidup di kepala rakyat.' },
+        astronaut: { title: 'Astronot', description: 'Profesi yang bikin macet bumi terasa ringan, karena masalahnya sudah pindah level ke luar angkasa.' },
+        businessman: { title: 'Pengusaha', description: 'Senyumnya ramah, jasnya mahal, dan otaknya otomatis menghitung untung bahkan sebelum duduk.' },
+        nurse: { title: 'Suster', description: 'Suara lembut, tangan cekatan, dan kemampuan menenangkan pasien panik lebih ampuh daripada motivator dadakan.' },
+        punk: { title: 'Anak Punk', description: 'Tampil berantakan buat seni, anti aturan buat gaya, tapi kadang justru paling jujur soal hidup.' },
+        musician: { title: 'Musician', description: 'Kalau belum terkenal dibilang hobi, kalau sudah laku baru semua orang mendadak bilang dari dulu sudah yakin—lengkap dengan gitar andalannya.' },
+        chef: { title: 'Koki', description: 'Topi tinggi, celemek rapi, dan aura "semua bisa diatur asal dapur jangan ramai sendiri".' },
+        carpenter: { title: 'Tukang Kayu', description: 'Baju kerja sederhana, kapak di tangan, dan semangat bikin segala hal jadi kokoh.' },
+        engineer: { title: 'Engineer', description: 'Helm proyek, vibe hitung-hitungan, dan muka yang kelihatan sedang debug dunia nyata.' },
+        sailor: { title: 'Pelaut', description: 'Pakaian laut, topi kecil, dan gaya orang yang akrab dengan ombak dan horizon.' },
+        gambler: { title: 'Tukang Judi', description: 'Tatapan nekat, kartu di tangan, dan aura "sekali lagi pasti balik modal" yang terlalu sering dipakai.' },
+        gardener: { title: 'Tukang Kebun', description: 'Topi kebun, warna hijau tanah, dan pembawaan orang yang lebih akrab dengan tanaman daripada rapat.' },
+      };
+
+      const CHARACTER_QUOTES = {
+        police: ['Pelicin mana, woi?', 'Seragam bersih, hati?', 'Hukum tumpul ke atas.', 'Tilang dulu, salah?', 'Jaga rakyat? Jaga dompet.', 'Surat lengkap? Bohong.', 'Melayani? Yang bener.', 'Pangkat naik, moral?'],
+        doctor: ['Tagihan lebih mematikan.', 'Resep? Saya juga bingung.', 'Pasien nunggu, duit duluan.', 'Obat mahal, sakit murah.', 'Keluhan banyak, peduli?', 'Diagnosa asal, tagih pasti.', 'Sehat itu mahal.', 'Rawat? Bayar dulu.', 'Stetoskop cuma aksesoris.', 'Hipokrates? Siapa tuh.', 'Operasi sukses, dompet mati.', 'Obat generik? Nggak elit.', 'Pasien banyak, empati kosong.', 'Gelar panjang, resep pendek.', 'Sakit dikit, cek lab semua.', 'Dokter Google lebih jujur.'],
+        minister: ['Janji doang, kerja?', 'Rapat lagi, hasil?', 'Slogan dulu, rakyat nanti.', 'Anggaran habis ke mana?', 'Kursi empuk, otak kosong.', 'Rakyat sabar, saya sibuk.', 'Program? Tinggal nama doang.', 'Laporan bagus, bukti?', 'Studi banding ke Eropa lagi.', 'Dana aspirasi, aspirasi siapa?', 'Sidang tidur, gaji terjaga.', 'Mobil dinas buat mudik.', 'Rakyat demo, saya meeting.', 'Kebijakan copy-paste.', 'Mic mati pas ditanya data.', 'Proyek mangkrak, cuan lancar.'],
+        president: ['Hidup pria solo!', 'Antek asing minggir!', 'Wibawa nomor satu.', 'Rakyat? Sabar dulu ya.', 'Saya yang paling benar.', 'Kritik? Tangkap aja.', 'Pencitraan level dewa.', 'Visi misi? Baca sendiri.', 'Oposisi itu khianat.', 'Satu periode kurang, dong.', 'Istana bukan penjara, enak.', 'Demo? Suruh pulang aja.', 'Media dikontrol, aman.', 'Kok berani kritik saya?', 'Titipan siapa lagi nih?', 'Kabinet isinya kasir.'],
+        soldier: ['Maju, jangan nangis!', 'Disiplin atau mati.', 'Perintah tidak dibantah.', 'Kuat atau pulang.', 'Medan tempur biasa.', 'Pengecut minggir sana.', 'Peluru bukan mainan.', 'Nyali kecil, pulang sana.'],
+        beggar: ['Receh dong, pelit!', 'Miskin bukan dosa.', 'Sedekah nggak rugi.', 'Nasib, bukan pilihan.', 'Muka memelas, strategi.', 'Kaya belum tentu bahagia.', 'Lapar tapi lari.', 'Duit siapa jatuh?', 'WiFi gratis, hidup mewah.', 'Kardus itu rumah minimalis.', 'Pajak? Nggak kenal.', 'Pengamen gagal, jadi ini.', 'Aset nol, utang nol, bebas.', 'Makan hari ini aja syukur.', 'Dermawan kok pelit banget.', 'Tangan di bawah, harga diri?'],
+        commoner: ['Gaji habis tanggal 10.', 'Cicilan nggak libur.', 'Hidup berat, terbiasa.', 'Kerja, tidur, ulang.', 'Capek? Biasa aja.', 'Tagihan lebih setia.', 'Mimpi gratis, hidup mahal.', 'Lembur tanpa bonus.', 'THR buat bayar utang.', 'Promo diskon, tetap mahal.', 'Naik gaji, naik harga juga.', 'Libur nasional tetap kerja.', 'Idup cuma bayar tagihan.', 'Tabungan? Dompet ketawa.', 'Healing cuma bisa nonton IG.', 'Pensiun? Kayaknya nggak.'],
+        employee: ['Kerja tim? Kerja gue.', 'Bos santai, gue mati.', 'Gaji kecil, tuntutan gede.', 'Resign kapan ya?', 'Lembur lagi, bonus?', 'Meeting doang, kerja kapan?', 'Deadline tadi pagi.', 'Slip gaji bikin nangis.'],
+        'civil-servant': ['Stempel dulu, urusan nanti.', 'Pelan tapi pasti?', 'Pensiunan lebih semangat.', 'Kerja santai, gaji pasti.', 'Berkas numpuk, santai.', 'Jam pulang paling hapal.', 'Rapel lebih ditunggu.', 'Reformasi? Besok aja.'],
+        astronaut: ['Bumi kecil, ego besar.', 'Gravitasi cuma alasan.', 'Kalian ribet amat.', 'Dari sini lucu.', 'Orbit lebih damai.', 'Roket lebih cepat.', 'Bumi penuh drama.', 'Luar angkasa, bebas macet.'],
+        businessman: ['Untung dulu, moral nanti.', 'Karyawan cuma aset.', 'Deal haram? Tergantung nominal.', 'Pajak? Kreatif aja.', 'Uang bicara segalanya.', 'Rugi itu aib.', 'Meeting cuma formalitas.', 'PHK itu efisiensi.'],
+        nurse: ['Dokter dapat nama, saya?', 'Sabar itu profesi saya.', 'Pasien rewel, biasa.', 'Shift malam lagi.', 'Senyum palsu, capek asli.', 'Gaji suster, beban dokter.', 'Infus lebih setia.', 'Jaga malam, siapa peduli?'],
+        punk: ['Aturan? Nggak kenal.', 'Sistem itu sampah.', 'Chaos itu indah.', 'Mohawk bukan gaya, prinsip.', 'Normal itu membosankan.', 'Pemberontak sejati.', 'Masyarakat terlalu jinak.', 'Bebas atau mati.'],
+        musician: ['Nada fals, tetap jalan.', 'Kalah? Bilang encore.', 'Gitar lebih setia.', 'Royalti mana, bang?', 'Fans banyak, duit?', 'Label cuma parasit.', 'Manggung hujan, fee?', 'Chord asal, vibe pas.'],
+        chef: ['Bumbu rahasia: MSG.', 'Gosong? Sebut karamelisasi.', 'Dapur panas, ego panas.', 'Bintang lima? Bintang satu.', 'Resep dicuri, biasa.', 'Pelanggan sok tahu.', 'Rasa lidah saya, titik.', 'Masak asal, plating bagus.'],
+        carpenter: ['Paku dulu, pikir nanti.', 'Kayu mahal, upah murah.', 'Tangan kapalan, dompet tipis.', 'Ukur sekali, potong salah.', 'Mandor cuma nunjuk.', 'Bangunan kokoh, punggung remuk.', 'Gergaji lebih jujur.', 'Kerja keras, bayar pas-pasan.'],
+        engineer: ['Bug itu fitur.', 'Deploy dulu, fix nanti.', 'Kode saya sempurna.', 'Stackoverflow jawab semua.', 'Deadline? Tambah sprint aja.', 'Testing itu opsional.', 'Dokumentasi buat yang lemah.', 'Rewrite dari nol aja.'],
+        sailor: ['Darat membosankan.', 'Ombak bukan masalah.', 'Mabuk laut? Lemah.', 'Laut lebih jujur.', 'Pelabuhan cuma singgah.', 'Badai itu pemanasan.', 'Darat penuh drama.', 'Kapten selalu benar.'],
+        gambler: ['All-in, tanpa pikir!', 'Hoki bukan kebetulan.', 'Kalah? Strategi jangka panjang.', 'Meja judi, kantor saya.', 'Modal nekat, untung gede.', 'Bandar juga manusia.', 'Sekali lagi, pasti balik.', 'Rugi itu investasi.'],
+        gardener: ['Tanaman lebih nurut.', 'Manusia lebih ribet.', 'Pupuk bukan parfum.', 'Gulma kayak masalah.', 'Sabar kayak tanam padi.', 'Tumbuh pelan, pasti.', 'Bunga nggak PHP.', 'Kebun lebih damai.'],
+      };
+
+      const LEADER_QUOTES = {
+        police: ['Sirene on, minggir!', 'Belakang, tertib ya.', 'Patroli paling depan.', 'Hukum saya, jalan saya.'],
+        doctor: ['Antre di belakang.', 'Kalian sakit semua.', 'Resep: lebih cepat.', 'Diagnosa: kalian payah.', 'Rujukan ke belakang ya.', 'Yang lambat butuh IGD.', 'Gelar saya lebih panjang.', 'Kalian cuma penyakit.'],
+        minister: ['Pidato sambil sprint.', 'Jargon menang duluan.', 'Rapat di podium.', 'Rakyat nonton aja.', 'Aspirasi rakyat: saya menang.', 'Anggaran buat kecepatan saya.', 'Yang belakang nggak lobi.', 'Kampanye terbukti, saya depan.'],
+        president: ['Barisan belakang, malu!', 'Rakyat, saya duluan.', 'Negara ikut saya.', 'Kritik? Nanti aja.', 'Istana finish duluan.', 'Yang belakang reshuffle semua.', 'Saya presiden, kalian rakyat.', 'Oposisi makin jauh.'],
+        soldier: ['Belakang, malu sama seragam!', 'Komandan selalu depan.', 'Pengecut di belakang.', 'Disiplin menang terus.'],
+        beggar: ['Miskin tapi pertama!', 'Yang kaya di mana?', 'Receh nanti, podium dulu.', 'Modal nekat, hasilnya?', 'Koin receh buat yang kalah.', 'Ngemis menang, kerja kalah.', 'Kartu ATM? Nggak punya, tapi depan.', 'Yang belakang lebih miskin.'],
+        commoner: ['Elite, minggir dong.', 'Gaji kecil, lari kencang.', 'Rakyat jelata memimpin.', 'Cicilan kejar, saya lebih.', 'UMR tapi juara satu.', 'Yang belakang pasti bos.', 'Pajak saya biayain kalian.', 'Rakyat kecil, nyali besar.'],
+        employee: ['Burnout tapi juara.', 'Bos mana? Saya depan.', 'KPI: posisi satu.', 'Lembur ada hasilnya.'],
+        'civil-servant': ['Pelan katanya? Lihat.', 'Stempel di podium.', 'Pensiunan bisa memimpin.', 'Santai tapi terdepan.'],
+        astronaut: ['Kalian jauh banget.', 'Dari orbit, kasihan.', 'Bumi penuh yang lambat.', 'Low gravity, high speed.'],
+        businessman: ['Akuisisi jalur depan.', 'ROI: posisi satu.', 'Kalian rugi semua.', 'Margin saya tebal.'],
+        nurse: ['Yang panik? Belakang.', 'Suster paling cepat.', 'Infus buat yang lambat.', 'Rawat ego kalian.'],
+        punk: ['Depan tanpa izin.', 'Aturan? Saya bikin.', 'Chaos di belakang.', 'Pemberontak nomor satu.'],
+        musician: ['Solo di depan.', 'Kalian cuma backing vocal.', 'Nada utama: saya.', 'Encore? Nggak perlu.'],
+        chef: ['Kalian masih mentah.', 'Matang duluan, bos.', 'Bumbu rahasia: kecepatan.', 'Dapur saya terdepan.'],
+        carpenter: ['Sudah pasang, kalian ukur.', 'Paku posisi satu.', 'Belakang masih amplas.', 'Tukang bisa memimpin.'],
+        engineer: ['Deploy duluan, sukses.', 'Bug kalian: lambat.', 'Kode saya jalan.', 'Kalian masih compile.'],
+        sailor: ['Kalian mabuk darat.', 'Kapten selalu depan.', 'Horizon milik saya.', 'Laut didominasi.'],
+        gambler: ['Jackpot posisi satu!', 'Odds kalian nol.', 'Nekat menang terus.', 'Taruhan saya bayar.'],
+        gardener: ['Kalian masih benih.', 'Sudah berbunga duluan.', 'Gulma di belakang.', 'Panen posisi satu.'],
+      };
+
+      const WINNER_CHEERS = {
+        police: ['Podium diamankan, bubar!', 'Hukum menang, titik.'],
+        doctor: ['Diagnosa: kalian payah.', 'Tagihan kemenangan, silakan.', 'Resep juara: kalian nggak mampu beli.', 'Pasien kalah, dokter menang, seperti biasa.'],
+        minister: ['Janji terbukti sekali.', 'Laporan: saya juara.', 'Dana kemenangan sudah dianggarkan.', 'Podium ini proyek strategis nasional.'],
+        president: ['HIDUP PRIA SOLO!', 'Rakyat, saya menang.', 'Yang kalah silakan dideportasi.', 'Podium milik negara, saya yang pegang.'],
+        soldier: ['Misi selesai, finish!', 'Hormat, saya juara.'],
+        beggar: ['Miskin menang, gimana?', 'Sedekah buat yang kalah.', 'Trofi ini bisa dijual nggak?', 'Yang kalah tolong transfer receh.'],
+        commoner: ['Rakyat jelata juara!', 'Elite makan tuh gengsi.', 'Gaji UMR, trofi nomor satu.', 'Menang tanpa koneksi, bisa tuh.'],
+        employee: ['Podium tanpa lembur.', 'Bos, saya resign menang.'],
+        'civil-servant': ['Stempel kemenangan, sah.', 'Pelan katanya? Juara.'],
+        astronaut: ['Orbit menang, bumi kalah.', 'Gravitasi bukan alasan.'],
+        businessman: ['Uang bicara, saya juara.', 'Akuisisi podium, done.'],
+        nurse: ['Panik? Saya juara kok.', 'Rawat yang kalah ya.'],
+        punk: ['Tanpa izin, juara.', 'Chaos menang, sistem kalah.'],
+        musician: ['Encore? Nggak perlu, juara.', 'Nada akhir: saya menang.'],
+        chef: ['Lawan gosong, saya matang.', 'Resep juara: kecepatan.'],
+        carpenter: ['Paku kemenangan, beres.', 'Kapak bicara, podium saya.'],
+        engineer: ['Deploy juara, production ready.', 'Bug kalian: terlalu lambat.'],
+        sailor: ['Berlabuh di podium.', 'Lawan karam semua.'],
+        gambler: ['All-in bayar, jackpot!', 'Odds saya selalu menang.'],
+        gardener: ['Panen podium, subur.', 'Kalian cuma gulma.'],
+      };
+
+      const DEFAULT_CHEER = 'Menang, titik.';
+      const DEFAULT_QUOTE = 'Gas, mikir nanti.';
+
+      // ── Mutable State ──
+      const state = {
+        racers: [],
+        animationId: null,
+        isRacing: false,
+        raceStartTime: null,
+        elapsedBeforeStop: 0,
+        winner: null,
+        trackWorld: null,
+        pausedAt: null,
+      };
+
+      // ── Runner Sprite Markup ──
+      const createRunnerMarkup = (role) => [
+        '<div class="runner-sprite ', role, '">',
+          '<div class="shadow"></div>',
+          '<div class="torso-wrap">',
+            '<div class="head"></div>',
+            '<div class="hair"></div>',
+            '<div class="hat"></div>',
+            '<div class="body"></div>',
+            '<div class="cross"></div>',
+            '<div class="stethoscope"></div>',
+            '<div class="stethoscope-ear"></div>',
+            '<div class="stethoscope-head"></div>',
+            '<div class="guitar"></div>',
+            '<div class="guitar-neck"></div>',
+            '<div class="guitar-head"></div>',
+            '<div class="guitar-hole"></div>',
+            '<div class="guitar-strings"></div>',
+            '<div class="apron"></div>',
+            '<div class="tool"></div>',
+            '<div class="helmet-band"></div>',
+            '<div class="card-mark"></div>',
+            '<div class="glove"></div>',
+            '<div class="sailor-collar"></div>',
+            '<div class="leaf-mark"></div>',
+            '<div class="medal"></div>',
+            '<div class="badge-mini"></div>',
+            '<div class="tie"></div>',
+            '<div class="patch"></div>',
+            '<div class="tear"></div>',
+            '<div class="hole"></div>',
+            '<div class="arm left"></div>',
+            '<div class="arm right"></div>',
+            '<div class="leg left bare"></div>',
+            '<div class="leg right bare"></div>',
+          '</div>',
+        '</div>',
+      ].join('');
+
+      // ── BGM ──
+      const bgm = new Audio('assets/bgm/run-run-game-bgm.mp3');
+      bgm.loop = true;
+      bgm.volume = 0.5;
+
+      const bgmFadeTo = (target, duration = 500) => {
+        const start = bgm.volume;
+        const startTime = performance.now();
+        const fade = () => {
+          const elapsed = performance.now() - startTime;
+          const t = Math.min(elapsed / duration, 1);
+          bgm.volume = start + (target - start) * t;
+          if (t < 1) requestAnimationFrame(fade);
+        };
+        requestAnimationFrame(fade);
+      };
+
+      // ── UI Helpers ──
+      const setStatus = (text) => { dom.statusBadge.textContent = `Status: ${text}`; };
+      const setWinnerText = (text) => { dom.winnerBox.textContent = text; };
+
+      const hideWinnerPopup = () => {
+        if (winnerAudio) { winnerAudio.pause(); winnerAudio = null; }
+        bgmFadeTo(0.5, 800);
+        dom.winnerPopup.classList.remove('show');
+      };
+
+      let winnerAudio = null;
+
+      const showWinnerPopup = (racer) => {
+        bgmFadeTo(0.1, 400);
+        const info = CHARACTER_INFO[racer.role] || { title: racer.role };
+        const cheers = WINNER_CHEERS[racer.role] || [DEFAULT_CHEER];
+        const images = CHARACTER_IMAGES[racer.role];
+        if (images && images.length > 0) {
+          dom.winnerAvatar.src = randomFrom(images);
+          dom.winnerAvatar.style.display = 'block';
+        } else {
+          dom.winnerAvatar.style.display = 'none';
+        }
+        const sounds = CHARACTER_SOUNDS[racer.role];
+        if (sounds && sounds.length > 0) {
+          if (winnerAudio) { winnerAudio.pause(); winnerAudio = null; }
+          winnerAudio = new Audio(randomFrom(sounds));
+          winnerAudio.play().catch(() => {});
+        }
+        dom.winnerRoleLabel.textContent = `Profesi Juara: ${info.title}`;
+        dom.winnerNameText.textContent = racer.name;
+        dom.winnerQuoteText.textContent = randomFrom(cheers);
+        dom.winnerPopup.classList.add('show');
+      };
+
+      const formatRaceTime = (ms) => {
+        const total = Math.floor(ms / 1000);
+        return `${String(Math.floor(total / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`;
+      };
+
+      const updateTimerBadge = () => {
+        const elapsed = state.isRacing && state.raceStartTime !== null
+          ? performance.now() - state.raceStartTime
+          : state.elapsedBeforeStop;
+        dom.timerBadge.textContent = `Waktu: ${formatRaceTime(elapsed)}`;
+      };
+
+      const resetTimerBadge = () => {
+        state.raceStartTime = null;
+        state.elapsedBeforeStop = 0;
+        updateTimerBadge();
+      };
+
+      const updateAnimDuration = (multiplier) => {
+        const safe = clamp(multiplier, 0.65, 1.55);
+        document.documentElement.style.setProperty('--run-duration', `${(0.5 / safe).toFixed(3)}s`);
+      };
+
+      const stopAnimation = () => {
+        if (state.animationId !== null) {
+          cancelAnimationFrame(state.animationId);
+          state.animationId = null;
+        }
+      };
+
+      // ── Name Parsing ──
+      const parseNames = (text) =>
+        text.split('\n').map(n => n.trim()).filter(Boolean).slice(0, 100);
+
+      const getParticipantNames = () =>
+        parseNames(dom.participantsInput.value.replace(/\r\n?/g, '\n'));
+
+      // ── Quote Selection ──
+      const getQuote = (role, isLeader) => {
+        const pool = isLeader
+          ? (LEADER_QUOTES[role] || CHARACTER_QUOTES[role])
+          : CHARACTER_QUOTES[role];
+        return randomFrom(pool || [DEFAULT_QUOTE]);
+      };
+
+      // ── Racer State Factory ──
+      const createRacer = (name, role, element) => ({
+        name,
+        role,
+        element,
+        chatEl: element.querySelector('.chat-bubble'),
+        x: RACE.START_X,
+        speed: 0,
+        fatigue: FATIGUE.MAX,
+        speedName: 'medium',
+        lastFatigueTickAt: 0,
+        nextSpeedDecisionAt: 0,
+        nextChatAt: 0,
+        chatHideAt: 0,
+        chatCount: 0,
+        penaltyUntil: 0,
+        adrenalineUntil: 0,
+        adrenalineUsed: false,
+        finished: false,
+        place: null,
+      });
+
+      const resetRacerState = (racer) => {
+        racer.x = RACE.START_X;
+        racer.speed = 0;
+        racer.fatigue = FATIGUE.MAX;
+        racer.speedName = 'medium';
+        racer.lastFatigueTickAt = 0;
+        racer.nextSpeedDecisionAt = 0;
+        racer.penaltyUntil = 0;
+        racer.adrenalineUntil = 0;
+        racer.adrenalineUsed = false;
+        racer.nextChatAt = 0;
+        racer.chatHideAt = 0;
+        racer.chatCount = 0;
+        racer.finished = false;
+        racer.place = null;
+
+        if (racer.chatEl) {
+          racer.chatEl.textContent = '';
+          racer.chatEl.classList.remove('show');
+        }
+
+        racer.element.style.left = `${RACE.START_X}px`;
+        racer.element.classList.remove('celebrate', 'running', 'fatigued');
+      };
+
+      // ── Racer Visual Update ──
+      const updateRacerVisuals = (racer, now) => {
+        racer.element.classList.toggle('fatigued', now < racer.penaltyUntil);
+
+        if (racer.chatEl) {
+          const visible = racer.chatHideAt > now;
+          racer.chatEl.classList.toggle('show', visible);
+          if (!visible) racer.chatEl.textContent = '';
+        }
+      };
+
+      // ── Chat System ──
+      const countVisibleChats = (now) =>
+        state.racers.filter(r => r.chatHideAt > now).length;
+
+      const tryShowChat = (racer, now, isLeader) => {
+        if (!racer.chatEl || racer.finished) return;
+        if (racer.chatCount >= TIMING.CHAT_MAX_PER_RACER) return;
+        if (now < racer.nextChatAt || racer.chatHideAt > now) return;
+        if (countVisibleChats(now) >= TIMING.CHAT_MAX_VISIBLE) return;
+
+        racer.chatEl.textContent = getQuote(racer.role, isLeader);
+        racer.chatHideAt = now + TIMING.CHAT_VISIBLE_MS;
+        racer.chatCount++;
+        racer.nextChatAt = now + TIMING.CHAT_DELAY_MS;
+      };
+
+      // ── Grass Decoration ──
+      const populateGrass = (grassLayer, namesCount, worldWidth) => {
+        if (!grassLayer) return;
+        grassLayer.innerHTML = '';
+
+        const count = clamp(namesCount * 3, 12, 36);
+        const padding = 18;
+        const usableH = Math.max(40, TRACK.HEIGHT - TRACK.SAFE_TOP - TRACK.SAFE_BOTTOM - padding * 2);
+
+        for (let i = 0; i < count; i++) {
+          const grass = document.createElement('div');
+          grass.className = 'grass-clump';
+          grass.appendChild(document.createElement('span'));
+
+          const x = Math.floor(Math.random() * Math.max(80, worldWidth - 140)) + 40;
+          const y = Math.floor(Math.random() * usableH) + padding;
+          const scale = (0.85 + Math.random() * 0.8).toFixed(2);
+          const rotate = Math.floor(Math.random() * 24) - 12;
+
+          grass.style.left = `${x}px`;
+          grass.style.top = `${y}px`;
+          grass.style.transform = `scale(${scale}) rotate(${rotate}deg)`;
+          grassLayer.appendChild(grass);
+        }
+
+        const pebbleColors = ['#9ca3af', '#6b7280', '#a8a29e', '#78716c', '#b0ada8'];
+        const pebbleCount = clamp(Math.floor(namesCount * 1.5), 6, 24);
+        for (let i = 0; i < pebbleCount; i++) {
+          const pebble = document.createElement('div');
+          pebble.className = 'pebble';
+          const w = 4 + Math.floor(Math.random() * 6);
+          const h = 3 + Math.floor(Math.random() * 4);
+          const x = Math.floor(Math.random() * Math.max(80, worldWidth - 140)) + 40;
+          const y = Math.floor(Math.random() * usableH) + padding;
+          const rotate = Math.floor(Math.random() * 360);
+          pebble.style.left = `${x}px`;
+          pebble.style.top = `${y}px`;
+          pebble.style.width = `${w}px`;
+          pebble.style.height = `${h}px`;
+          pebble.style.background = randomFrom(pebbleColors);
+          pebble.style.transform = `rotate(${rotate}deg)`;
+          grassLayer.appendChild(pebble);
+        }
+      };
+
+      // ── Page Navigation ──
+      const switchPage = (page) => {
+        const isRace = page === 'race';
+        dom.racePage.classList.toggle('active', isRace);
+        dom.characterPage.classList.toggle('active', !isRace);
+        dom.showRacePageBtn.classList.toggle('active', isRace);
+        dom.showCharacterPageBtn.classList.toggle('active', !isRace);
+      };
+
+      // ── Character Gallery ──
+      const renderCharacterGallery = () => {
+        dom.characterGrid.innerHTML = '';
+        for (const role of CHARACTERS) {
+          const card = document.createElement('div');
+          card.className = 'character-card';
+          const info = CHARACTER_INFO[role];
+          card.innerHTML = `${createRunnerMarkup(role)}<h3>${info.title}</h3><p>${info.description}</p>`;
+          dom.characterGrid.appendChild(card);
+        }
+      };
+
+      // ── Speed & Fatigue Logic ──
+      const tryTriggerAdrenaline = (racer, now, remainingMs) => {
+        if (racer.finished || racer.adrenalineUsed) return;
+        if (remainingMs > 5000 || remainingMs <= 0) return;
+        if (Math.random() < 0.0038) {
+          racer.adrenalineUsed = true;
+          racer.adrenalineUntil = now + FATIGUE.ADRENALINE_MS;
+          racer.speedName = 'veryFast';
+        }
+      };
+
+      const tickFatigue = (racer, now) => {
+        if (racer.lastFatigueTickAt === 0) {
+          racer.lastFatigueTickAt = now;
+          return;
+        }
+
+        while (now - racer.lastFatigueTickAt >= 1000) {
+          racer.lastFatigueTickAt += 1000;
+          if (now < racer.adrenalineUntil) continue;
+
+          const { fatigueDelta } = SPEEDS[racer.speedName];
+          racer.fatigue = clamp(racer.fatigue + fatigueDelta, 0, FATIGUE.MAX);
+
+          if (racer.fatigue <= 0) {
+            racer.penaltyUntil = now + FATIGUE.PENALTY_MS;
+            racer.speedName = 'slow';
+            racer.nextSpeedDecisionAt = racer.penaltyUntil;
+          }
+        }
+      };
+
+      const updateSpeed = (racer, now) => {
+        if (racer.finished) return;
+
+        if (now < racer.adrenalineUntil) {
+          racer.speedName = 'veryFast';
+          return;
+        }
+        if (now < racer.penaltyUntil || racer.fatigue <= 0) {
+          racer.speedName = 'slow';
+          return;
+        }
+        if (now < racer.nextSpeedDecisionAt) return;
+
+        racer.speedName = randomFrom(SPEED_NAMES);
+        racer.nextSpeedDecisionAt = now + randomBetween(TIMING.SPEED_CHANGE_MIN_MS, TIMING.SPEED_CHANGE_MAX_MS);
+      };
+
+      // ── Spectators ──
+      const SKIN_TONES = ['#f5d0a9','#e8b88a','#c68e6a','#a0674b','#7a4b32','#f9d6b0'];
+      const SHIRT_COLORS = ['#ef4444','#3b82f6','#22c55e','#f59e0b','#a855f7','#ec4899','#14b8a6','#f97316','#6366f1','#84cc16'];
+      const ANIM_CLASSES = ['cheering','waving','jumping','','',''];
+
+      const buildSpectatorRow = (worldWidth, rowClass) => {
+        const row = document.createElement('div');
+        row.className = `spectator-row ${rowClass}`;
+        const spacing = rowClass === 'row-back' ? 16 : rowClass === 'row-mid' ? 18 : 20;
+        const count = Math.floor(worldWidth / spacing);
+        for (let i = 0; i < count; i++) {
+          const skin = randomFrom(SKIN_TONES);
+          const shirt = randomFrom(SHIRT_COLORS);
+          const anim = randomFrom(ANIM_CLASSES);
+          const el = document.createElement('div');
+          el.className = `spectator ${anim}`;
+          el.style.animationDelay = `${Math.random() * 2}s`;
+          el.innerHTML = `
+            <div class="spectator-head" style="background:${skin}"></div>
+            <div class="spectator-arms" style="background:${skin}"></div>
+            <div class="spectator-body" style="background:${shirt}"></div>
+          `;
+          row.appendChild(el);
+        }
+        return row;
+      };
+
+      const buildSpectatorArea = (worldWidth) => {
+        const area = document.createElement('div');
+        area.className = 'spectator-area';
+        area.appendChild(buildSpectatorRow(worldWidth, 'row-back'));
+        area.appendChild(buildSpectatorRow(worldWidth, 'row-mid'));
+        area.appendChild(buildSpectatorRow(worldWidth, 'row-front'));
+        return area;
+      };
+
+      // ── Arena Setup ──
+      const buildTrackWorld = () => {
+        const trackWorld = document.createElement('div');
+        trackWorld.className = 'track-world';
+
+        const grassLayer = document.createElement('div');
+        grassLayer.className = 'grass-layer';
+        trackWorld.appendChild(grassLayer);
+
+        const finishLine = document.createElement('div');
+        finishLine.className = 'finish-line';
+        trackWorld.appendChild(finishLine);
+
+        dom.track.innerHTML = '';
+        dom.track.appendChild(trackWorld);
+
+        // Add spectator rows inside trackWorld so they scroll with the camera
+        const spectators = buildSpectatorArea(TRACK.WORLD_WIDTH);
+        trackWorld.insertBefore(spectators, trackWorld.firstChild);
+
+        return { trackWorld, grassLayer, finishLine };
+      };
+
+      const buildArena = () => {
+        stopAnimation();
+        resetTimerBadge();
+        state.isRacing = false;
+        state.winner = null;
+
+        const worldWidth = TRACK.WORLD_WIDTH;
+        const { trackWorld, grassLayer } = buildTrackWorld();
+        state.trackWorld = trackWorld;
+
+        const names = getParticipantNames();
+        const usableHeight = TRACK.HEIGHT - TRACK.SAFE_TOP - TRACK.SAFE_BOTTOM;
+        const laneHeight = names.length > 0
+          ? Math.max(TRACK.MIN_LANE_HEIGHT, Math.floor(usableHeight / names.length))
+          : 76;
+
+        dom.track.style.setProperty('--world-width', `${worldWidth}px`);
+        dom.track.style.setProperty('--lane-height', `${laneHeight}px`);
+        dom.track.style.height = `${TRACK.HEIGHT}px`;
+        dom.track.style.minHeight = `${TRACK.HEIGHT}px`;
+        dom.track.style.setProperty('--track-safe-top', `${TRACK.SAFE_TOP}px`);
+        dom.track.style.setProperty('--track-safe-bottom', `${TRACK.SAFE_BOTTOM}px`);
+        dom.track.style.setProperty('--runner-scale', '1');
+        trackWorld.style.width = `${worldWidth}px`;
+        trackWorld.style.height = `${usableHeight}px`;
+        dom.participantCount.textContent = `Peserta: ${names.length}`;
+        populateGrass(grassLayer, Math.max(1, names.length), worldWidth);
+
+        if (names.length < 2) {
+          state.racers = [];
+          setStatus('butuh minimal 2 peserta');
+          setWinnerText('Masukkan minimal 2 nama peserta.');
+          return;
+        }
+
+        setStatus('siap');
+        setWinnerText('Arena siap. Tekan Mulai Race.');
+
+        // Distribute professions evenly: max ceil(playerCount / professionCount) per profession
+        const maxPerRole = Math.ceil(names.length / CHARACTERS.length);
+        const rolePool = [];
+        const shuffledRoles = [...CHARACTERS].sort(() => Math.random() - 0.5);
+        for (const role of shuffledRoles) {
+          for (let i = 0; i < maxPerRole; i++) rolePool.push(role);
+        }
+        // Shuffle the pool and take only what we need
+        rolePool.sort(() => Math.random() - 0.5);
+        const assignedRoles = rolePool.slice(0, names.length);
+
+        state.racers = names.map((name, index) => {
+          const lane = document.createElement('div');
+          lane.className = 'lane';
+          lane.style.position = 'absolute';
+          lane.style.left = '0';
+          lane.style.right = '0';
+          lane.style.height = '0px';
+
+          const runner = document.createElement('div');
+          runner.className = 'runner';
+          const role = assignedRoles[index];
+
+          const nameEl = document.createElement('div');
+          nameEl.className = 'duck-name';
+          nameEl.title = name;
+          nameEl.textContent = name;
+
+          const chatEl = document.createElement('div');
+          chatEl.className = 'chat-bubble';
+
+          runner.innerHTML = createRunnerMarkup(role);
+          runner.appendChild(nameEl);
+          runner.appendChild(chatEl);
+          lane.appendChild(runner);
+
+          const halfH = RACE.RUNNER_HALF_HEIGHT;
+          const maxSpread = usableHeight - halfH * 2;
+          const maxLaneSpacing = 76;
+          const totalGroupH = names.length <= 1
+            ? 0
+            : Math.min(maxSpread, (names.length - 1) * maxLaneSpacing);
+          const groupStart = (usableHeight - totalGroupH) / 2;
+          const laneTop = names.length <= 1
+            ? usableHeight / 2
+            : groupStart + totalGroupH * (index / (names.length - 1));
+
+          lane.style.top = `${laneTop}px`;
+          trackWorld.appendChild(lane);
+
+          const racer = createRacer(name, role, runner);
+          updateRacerVisuals(racer, 0);
+          return racer;
+        });
+      };
+
+      // ── Reset Positions ──
+      const resetRacePositions = () => {
+        resetTimerBadge();
+        hideWinnerPopup();
+
+        if (state.trackWorld) state.trackWorld.style.transform = 'translateX(0px)';
+
+        state.racers.forEach(resetRacerState);
+        updateAnimDuration(1);
+        state.winner = null;
+
+        const hasEnough = state.racers.length >= 2;
+        setStatus(hasEnough ? 'siap' : 'butuh minimal 2 peserta');
+        setWinnerText(hasEnough ? 'Posisi direset. Tekan Mulai Race.' : 'Masukkan minimal 2 nama peserta.');
+      };
+
+      // ── Main Race Loop ──
+      const startRace = () => {
+        if (state.isRacing) return;
+        if (state.racers.length < 2) {
+          buildArena();
+          if (state.racers.length < 2) return;
+        }
+
+        resetRacePositions();
+        state.isRacing = true;
+        bgm.volume = 0.5;
+        bgm.currentTime = 0;
+        bgm.play().catch(() => {});
+        setStatus('balapan dimulai');
+        setWinnerText('Balapan sedang berlangsung...');
+        state.raceStartTime = performance.now();
+        state.elapsedBeforeStop = 0;
+        updateTimerBadge();
+
+        const startTime = state.raceStartTime;
+        state.racers.forEach((racer) => {
+          racer.element.classList.add('running');
+          racer.lastFatigueTickAt = startTime;
+          racer.nextSpeedDecisionAt = startTime + randomBetween(400, 1000);
+          racer.nextChatAt = startTime + randomBetween(TIMING.CHAT_START_MIN_MS, TIMING.CHAT_START_MAX_MS);
+        });
+
+        const trackWorld = state.trackWorld;
+        const finishLine = trackWorld.querySelector('.finish-line');
+        const worldWidth = trackWorld.offsetWidth;
+        const finishLineW = finishLine.offsetWidth || RACE.FINISH_LINE_WIDTH;
+        const finishCenter = worldWidth - RACE.FINISH_RIGHT_OFFSET - finishLineW / 2;
+        const finishX = Math.max(120, finishCenter - RACE.RUNNER_CENTER_OFFSET);
+        let finishedCount = 0;
+        let prevNow = startTime;
+
+        const animate = (now) => {
+          updateTimerBadge();
+          const dt = Math.min(0.05, (now - prevNow) / 1000);
+          prevNow = now;
+          const elapsedMs = now - startTime;
+          const remainingMs = Math.max(0, RACE.TARGET_SECONDS * 1000 - elapsedMs);
+
+          const leaderPos = state.racers.reduce((max, r) => Math.max(max, r.x), 0);
+
+          for (const racer of state.racers) {
+            if (racer.finished) continue;
+
+            tryTriggerAdrenaline(racer, now, remainingMs);
+            tickFatigue(racer, now);
+            updateSpeed(racer, now);
+
+            const isLeader = leaderPos - racer.x <= 12;
+            tryShowChat(racer, now, isLeader);
+
+            const activeSpeed = now < racer.adrenalineUntil ? SPEEDS.veryFast : SPEEDS[racer.speedName];
+            racer.speed += (activeSpeed.pixelsPerSecond - racer.speed) * 0.16;
+            racer.x += racer.speed * dt;
+            racer.element.style.left = `${racer.x}px`;
+            updateRacerVisuals(racer, now);
+
+            if (!state.winner) updateAnimDuration(activeSpeed.animFactor);
+
+            if (racer.x >= finishX) {
+              racer.x = finishX;
+              racer.element.style.left = `${finishX}px`;
+              racer.finished = true;
+              racer.place = ++finishedCount;
+
+              if (!state.winner) {
+                state.winner = racer;
+                racer.element.classList.add('celebrate');
+                setWinnerText(`🏆 Pemenang: ${racer.name}`);
+                setStatus('selesai');
+                showWinnerPopup(racer);
+              }
+            }
+          }
+
+          const leaderX = state.racers.reduce((max, r) => Math.max(max, r.x), 0);
+          const maxCamX = Math.max(0, worldWidth - dom.track.clientWidth);
+          const camX = clamp(leaderX - RACE.CAMERA_LEAD, 0, maxCamX);
+          trackWorld.style.transform = `translateX(${-camX}px)`;
+
+          if (finishedCount < state.racers.length) {
+            state.animationId = requestAnimationFrame(animate);
+          } else {
+            state.isRacing = false;
+            state.animationId = null;
+            state.elapsedBeforeStop = performance.now() - startTime;
+            updateTimerBadge();
+            state.racers.forEach(r => r.element.classList.remove('running'));
+            updateAnimDuration(1);
+          }
+        };
+
+        state.animationId = requestAnimationFrame((first) => {
+          prevNow = first;
+          animate(first);
+        });
+      };
+
+      // ── Event Listeners ──
+      dom.buildBtn.addEventListener('click', buildArena);
+      dom.startBtn.addEventListener('click', startRace);
+      dom.resetBtn.addEventListener('click', () => {
+        stopAnimation();
+        state.isRacing = false;
+        bgm.pause();
+        bgm.currentTime = 0;
+        bgm.volume = 0.5;
+        buildArena();
+        resetRacePositions();
+      });
+      dom.showRacePageBtn.addEventListener('click', () => switchPage('race'));
+      dom.showCharacterPageBtn.addEventListener('click', () => switchPage('character'));
+      dom.winnerCloseBtn.addEventListener('click', hideWinnerPopup);
+      dom.winnerPopup.addEventListener('click', (e) => {
+        if (e.target === dom.winnerPopup) hideWinnerPopup();
+      });
+      document.addEventListener('visibilitychange', () => {
+        if (!state.isRacing) return;
+
+        if (document.hidden) {
+          stopAnimation();
+          state.pausedAt = performance.now();
+          state.racers.forEach(r => r.element.classList.remove('running'));
+          setStatus('dijeda (tab tidak aktif)');
+        } else if (state.pausedAt !== null) {
+          const pauseDuration = performance.now() - state.pausedAt;
+          state.raceStartTime += pauseDuration;
+          state.racers.forEach(r => {
+            r.lastFatigueTickAt += pauseDuration;
+            r.nextSpeedDecisionAt += pauseDuration;
+            r.nextChatAt += pauseDuration;
+            if (r.chatHideAt > 0) r.chatHideAt += pauseDuration;
+            if (r.penaltyUntil > 0) r.penaltyUntil += pauseDuration;
+            if (r.adrenalineUntil > 0) r.adrenalineUntil += pauseDuration;
+            if (!r.finished) r.element.classList.add('running');
+          });
+          state.pausedAt = null;
+          setStatus('balapan dimulai');
+
+          let prevNow = performance.now();
+          const trackWorld = state.trackWorld;
+          const worldWidth = trackWorld.offsetWidth;
+          const finishLine = trackWorld.querySelector('.finish-line');
+          const finishLineW = finishLine.offsetWidth || RACE.FINISH_LINE_WIDTH;
+          const finishCenter = worldWidth - RACE.FINISH_RIGHT_OFFSET - finishLineW / 2;
+          const finishX = Math.max(120, finishCenter - RACE.RUNNER_CENTER_OFFSET);
+          const startTime = state.raceStartTime;
+          let finishedCount = state.racers.filter(r => r.finished).length;
+
+          const animate = (now) => {
+            updateTimerBadge();
+            const dt = Math.min(0.05, (now - prevNow) / 1000);
+            prevNow = now;
+            const elapsedMs = now - startTime;
+            const remainingMs = Math.max(0, RACE.TARGET_SECONDS * 1000 - elapsedMs);
+            const leaderPos = state.racers.reduce((max, r) => Math.max(max, r.x), 0);
+
+            for (const racer of state.racers) {
+              if (racer.finished) continue;
+              tryTriggerAdrenaline(racer, now, remainingMs);
+              tickFatigue(racer, now);
+              updateSpeed(racer, now);
+              const isLeader = leaderPos - racer.x <= 12;
+              tryShowChat(racer, now, isLeader);
+              const activeSpeed = now < racer.adrenalineUntil ? SPEEDS.veryFast : SPEEDS[racer.speedName];
+              racer.speed += (activeSpeed.pixelsPerSecond - racer.speed) * 0.16;
+              racer.x += racer.speed * dt;
+              racer.element.style.left = `${racer.x}px`;
+              updateRacerVisuals(racer, now);
+              if (!state.winner) updateAnimDuration(activeSpeed.animFactor);
+
+              if (racer.x >= finishX) {
+                racer.x = finishX;
+                racer.element.style.left = `${finishX}px`;
+                racer.finished = true;
+                racer.place = ++finishedCount;
+                if (!state.winner) {
+                  state.winner = racer;
+                  racer.element.classList.add('celebrate');
+                  setWinnerText(`\u{1F3C6} Pemenang: ${racer.name}`);
+                  setStatus('selesai');
+                  showWinnerPopup(racer);
+                }
+              }
+            }
+
+            const leaderX = state.racers.reduce((max, r) => Math.max(max, r.x), 0);
+            const maxCamX = Math.max(0, worldWidth - dom.track.clientWidth);
+            const camX = clamp(leaderX - RACE.CAMERA_LEAD, 0, maxCamX);
+            trackWorld.style.transform = `translateX(${-camX}px)`;
+
+            if (finishedCount < state.racers.length) {
+              state.animationId = requestAnimationFrame(animate);
+            } else {
+              state.isRacing = false;
+              state.animationId = null;
+              state.elapsedBeforeStop = performance.now() - startTime;
+              updateTimerBadge();
+              state.racers.forEach(r => r.element.classList.remove('running'));
+              updateAnimDuration(1);
+            }
+          };
+
+          state.animationId = requestAnimationFrame((first) => {
+            prevNow = first;
+            animate(first);
+          });
+        }
+      });
+
+      window.addEventListener('resize', () => {
+        if (!state.isRacing) {
+          state.racers.forEach(r => { r.element.style.left = `${r.x}px`; });
+        }
+      });
+
+      // ── Init ──
+      updateAnimDuration(1);
+      renderCharacterGallery();
+      buildArena();
+    })();
+  </script>
+
+  <script>
+  // ── Side Slides ──
+  (() => {
+    const images = [
+      'assets/image/side-slide/pro-balet.webp',
+      'assets/image/side-slide/sawit-ku.webp',
+      'assets/image/side-slide/tukang-kayu.webp',
+      'assets/image/side-slide/wakit-pejabat.webp',
+    ];
+
+    function buildSlideCards(count) {
+      // Duplicate images to fill, then double for seamless loop
+      const items = [];
+      while (items.length < count) {
+        for (const src of images) {
+          if (items.length < count) items.push(src);
+        }
+      }
+      // Double for infinite seamless scroll
+      return [...items, ...items];
+    }
+
+    function createCard(src) {
+      const card = document.createElement('div');
+      card.className = 'slide-card';
+      card.innerHTML = `
+        <div class="slide-card-inner">
+          <img src="${src}" alt="" loading="lazy" />
+        </div>
+        <div class="slide-card-glow"></div>
+        <div class="slide-card-filter"></div>
+      `;
+      return card;
+    }
+
+    function populateSide(container, cardCount, direction) {
+      const track = document.createElement('div');
+      track.className = 'side-slide-track';
+      const cards = buildSlideCards(cardCount);
+      for (const src of cards) track.appendChild(createCard(src));
+      container.appendChild(track);
+
+      // Wait for images to load, then calc half-height for seamless loop
+      requestAnimationFrame(() => {
+        setTimeout(() => {
+          const halfH = track.scrollHeight / 2;
+          const speed = 80; // px per second
+          const dur = halfH / speed;
+          const name = `slide_${direction}`;
+          const dir = direction === 'up' ? `0px, -${halfH}px` : `-${halfH}px, 0px`;
+          const style = document.createElement('style');
+          style.textContent = `@keyframes ${name} { 0% { transform: translateY(${dir.split(',')[0]}); } 100% { transform: translateY(${dir.split(',')[1].trim()}); } }`;
+          document.head.appendChild(style);
+          track.style.animation = `${name} ${dur}s linear infinite`;
+        }, 300);
+      });
+    }
+
+    const left = document.getElementById('sideSlideLeft');
+    const right = document.getElementById('sideSlideRight');
+    populateSide(left, 6, 'up');
+    populateSide(right, 6, 'down');
+  })();
+  </script>
+
+  <script>
+  // ── Vortex Background (simplex-noise 3D inline) ──
+  (() => {
+    // Inline simplex-noise 3D implementation
+    const F3 = 1/3, G3 = 1/6;
+    const grad3 = [[1,1,0],[-1,1,0],[1,-1,0],[-1,-1,0],[1,0,1],[-1,0,1],[1,0,-1],[-1,0,-1],[0,1,1],[0,-1,1],[0,1,-1],[0,-1,-1]];
+    const perm = new Uint8Array(512);
+    const permMod12 = new Uint8Array(512);
+    const p = new Uint8Array(256);
+    for (let i = 0; i < 256; i++) p[i] = i;
+    for (let i = 255; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [p[i], p[j]] = [p[j], p[i]]; }
+    for (let i = 0; i < 512; i++) { perm[i] = p[i & 255]; permMod12[i] = perm[i] % 12; }
+
+    function noise3D(xin, yin, zin) {
+      let n0, n1, n2, n3;
+      const s = (xin + yin + zin) * F3;
+      const i = Math.floor(xin + s), j = Math.floor(yin + s), k = Math.floor(zin + s);
+      const t = (i + j + k) * G3;
+      const X0 = i - t, Y0 = j - t, Z0 = k - t;
+      const x0 = xin - X0, y0 = yin - Y0, z0 = zin - Z0;
+      let i1, j1, k1, i2, j2, k2;
+      if (x0 >= y0) { if (y0 >= z0) { i1=1;j1=0;k1=0;i2=1;j2=1;k2=0; } else if (x0 >= z0) { i1=1;j1=0;k1=0;i2=1;j2=0;k2=1; } else { i1=0;j1=0;k1=1;i2=1;j2=0;k2=1; } }
+      else { if (y0 < z0) { i1=0;j1=0;k1=1;i2=0;j2=1;k2=1; } else if (x0 < z0) { i1=0;j1=1;k1=0;i2=0;j2=1;k2=1; } else { i1=0;j1=1;k1=0;i2=1;j2=1;k2=0; } }
+      const x1 = x0-i1+G3, y1 = y0-j1+G3, z1 = z0-k1+G3;
+      const x2 = x0-i2+2*G3, y2 = y0-j2+2*G3, z2 = z0-k2+2*G3;
+      const x3 = x0-1+3*G3, y3 = y0-1+3*G3, z3 = z0-1+3*G3;
+      const ii = i & 255, jj = j & 255, kk = k & 255;
+      let t0 = 0.6 - x0*x0 - y0*y0 - z0*z0;
+      if (t0 < 0) n0 = 0; else { t0 *= t0; const gi0 = permMod12[ii+perm[jj+perm[kk]]]; n0 = t0*t0*(grad3[gi0][0]*x0+grad3[gi0][1]*y0+grad3[gi0][2]*z0); }
+      let t1 = 0.6 - x1*x1 - y1*y1 - z1*z1;
+      if (t1 < 0) n1 = 0; else { t1 *= t1; const gi1 = permMod12[ii+i1+perm[jj+j1+perm[kk+k1]]]; n1 = t1*t1*(grad3[gi1][0]*x1+grad3[gi1][1]*y1+grad3[gi1][2]*z1); }
+      let t2 = 0.6 - x2*x2 - y2*y2 - z2*z2;
+      if (t2 < 0) n2 = 0; else { t2 *= t2; const gi2 = permMod12[ii+i2+perm[jj+j2+perm[kk+k2]]]; n2 = t2*t2*(grad3[gi2][0]*x2+grad3[gi2][1]*y2+grad3[gi2][2]*z2); }
+      let t3 = 0.6 - x3*x3 - y3*y3 - z3*z3;
+      if (t3 < 0) n3 = 0; else { t3 *= t3; const gi3 = permMod12[ii+1+perm[jj+1+perm[kk+1]]]; n3 = t3*t3*(grad3[gi3][0]*x3+grad3[gi3][1]*y3+grad3[gi3][2]*z3); }
+      return 32 * (n0 + n1 + n2 + n3);
+    }
+
+    const canvas = document.getElementById('vortexCanvas');
+    const ctx = canvas.getContext('2d');
+
+    const PARTICLE_COUNT = 250;
+    const PROP_COUNT = 9;
+    const PROPS_LEN = PARTICLE_COUNT * PROP_COUNT;
+    const RANGE_Y = 300;
+    const BASE_TTL = 50, RANGE_TTL = 150;
+    const BASE_SPEED = 0.0, RANGE_SPEED = 1.2;
+    const BASE_RADIUS = 1, RANGE_RADIUS = 2;
+    const BASE_HUE = 220, RANGE_HUE = 100;
+    const NOISE_STEPS = 3;
+    const X_OFF = 0.00125, Y_OFF = 0.00125, Z_OFF = 0.0005;
+    const TAU = 2 * Math.PI;
+    const BG = '#0a0a1a';
+
+    let tick = 0;
+    let particles = new Float32Array(PROPS_LEN);
+    let center = [0, 0];
+    let animId;
+
+    const rand = (n) => n * Math.random();
+    const randRange = (n) => n - rand(2 * n);
+    const fadeInOut = (t, m) => { const hm = 0.5 * m; return Math.abs(((t + hm) % m) - hm) / hm; };
+    const lerp = (a, b, s) => (1 - s) * a + s * b;
+
+    const VORTEX_SCALE = window.innerWidth <= 900 ? 0.5 : 0.75;
+    function resize() {
+      canvas.width = window.innerWidth * VORTEX_SCALE;
+      canvas.height = window.innerHeight * VORTEX_SCALE;
+      canvas.style.width = window.innerWidth + 'px';
+      canvas.style.height = window.innerHeight + 'px';
+      center[0] = 0.5 * canvas.width;
+      center[1] = 0.5 * canvas.height;
+    }
+
+    function initParticle(i) {
+      const x = rand(canvas.width);
+      const y = center[1] + randRange(RANGE_Y);
+      particles.set([x, y, 0, 0, 0, BASE_TTL + rand(RANGE_TTL), BASE_SPEED + rand(RANGE_SPEED), BASE_RADIUS + rand(RANGE_RADIUS), BASE_HUE + rand(RANGE_HUE)], i);
+    }
+
+    function initAll() {
+      tick = 0;
+      particles = new Float32Array(PROPS_LEN);
+      for (let i = 0; i < PROPS_LEN; i += PROP_COUNT) initParticle(i);
+    }
+
+    function drawParticle(x, y, x2, y2, life, ttl, radius, hue) {
+      ctx.lineCap = 'round';
+      ctx.lineWidth = radius;
+      ctx.strokeStyle = `hsla(${hue},100%,60%,${fadeInOut(life, ttl)})`;
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      ctx.lineTo(x2, y2);
+      ctx.stroke();
+    }
+
+    function updateParticle(i) {
+      let x = particles[i], y = particles[i+1];
+      const n = noise3D(x * X_OFF, y * Y_OFF, tick * Z_OFF) * NOISE_STEPS * TAU;
+      const vx = lerp(particles[i+2], Math.cos(n), 0.5);
+      const vy = lerp(particles[i+3], Math.sin(n), 0.5);
+      let life = particles[i+4];
+      const ttl = particles[i+5], speed = particles[i+6], radius = particles[i+7], hue = particles[i+8];
+      const x2 = x + vx * speed, y2 = y + vy * speed;
+
+      drawParticle(x, y, x2, y2, life, ttl, radius, hue);
+      life++;
+      particles[i] = x2; particles[i+1] = y2;
+      particles[i+2] = vx; particles[i+3] = vy;
+      particles[i+4] = life;
+
+      if (x2 > canvas.width || x2 < 0 || y2 > canvas.height || y2 < 0 || life > ttl) initParticle(i);
+    }
+
+    function frame() {
+      tick++;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = BG;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      for (let i = 0; i < PROPS_LEN; i += PROP_COUNT) updateParticle(i);
+
+      // Glow pass (single pass instead of 3)
+      ctx.save();
+      ctx.filter = 'blur(6px) brightness(180%)';
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.drawImage(canvas, 0, 0);
+      ctx.restore();
+
+      animId = requestAnimationFrame(frame);
+    }
+
+    resize();
+    initAll();
+    frame();
+    window.addEventListener('resize', () => { resize(); });
+  })();
+  </script>
+</body>
+</html>

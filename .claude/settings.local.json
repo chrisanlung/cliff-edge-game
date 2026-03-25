@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node:*)",
+      "Bash(for role:*)",
+      "Bash(do)",
+      "Bash(mkdir -p \"F:/Projects/game/assets/sound/$role\")",
+      "Bash(done)",
+      "Bash(for dir:*)",
+      "Bash(do echo:*)",
+      "Read(//f/Projects/game/assets/sound/**)"
+    ]
+  }
+}
